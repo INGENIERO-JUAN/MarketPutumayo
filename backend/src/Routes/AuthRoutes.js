@@ -1,0 +1,109 @@
+const express = require('express');
+const router = express.Router();
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const db = require('../Config/db');
+
+// REGISTRO
+router.post('/registro', async (req, res) => {
+  try {
+    const { nombre, correo, password, rol, telefono, municipio } = req.body;
+
+    // Validar datos
+    if (!nombre || !correo || !password || !rol) {
+      return res.status(400).json({ error: 'Faltan datos requeridos' });
+    }
+
+    // Validar que el rol sea válido
+    const rolesValidos = ['ADMIN', 'PRODUCTOR', 'COMPRADOR'];
+    if (!rolesValidos.includes(rol)) {
+      return res.status(400).json({ error: 'Rol inválido' });
+    }
+
+    // Verificar si el correo ya existe
+    const [usuarioExistente] = await db.promise().query(
+      'SELECT id_usuario FROM usuarios WHERE correo = ?',
+      [correo]
+    );
+
+    if (usuarioExistente.length > 0) {
+      return res.status(400).json({ error: 'El correo ya está registrado' });
+    }
+
+    // Encriptar contraseña
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Insertar usuario
+    const [resultado] = await db.promise().query(
+      'INSERT INTO usuarios (nombre, correo, password_hash, rol, telefono, municipio) VALUES (?, ?, ?, ?, ?, ?)',
+      [nombre, correo, hashedPassword, rol, telefono || null, municipio || null]
+    );
+
+    res.status(201).json({
+      mensaje: 'Usuario registrado exitosamente',
+      id_usuario: resultado.insertId
+    });
+  } catch (error) {
+    console.error('Error en registro:', error);
+    res.status(500).json({ error: 'Error en el servidor' });
+  }
+});
+
+// LOGIN
+router.post('/login', async (req, res) => {
+  try {
+    const { correo, password } = req.body;
+
+    // Validar datos
+    if (!correo || !password) {
+      return res.status(400).json({ error: 'Correo y contraseña requeridos' });
+    }
+
+    // Buscar usuario
+    const [usuarios] = await db.promise().query(
+      'SELECT id_usuario, nombre, correo, password_hash, rol FROM usuarios WHERE correo = ?',
+      [correo]
+    );
+
+    if (usuarios.length === 0) {
+      return res.status(401).json({ error: 'Credenciales inválidas' });
+    }
+
+    const usuario = usuarios[0];
+
+    // Verificar contraseña
+    const passwordValida = await bcrypt.compare(password, usuario.password_hash);
+
+    if (!passwordValida) {
+      return res.status(401).json({ error: 'Credenciales inválidas' });
+    }
+
+    // Generar token
+    const token = jwt.sign(
+      {
+        id_usuario: usuario.id_usuario,
+        correo: usuario.correo,
+        nombre: usuario.nombre,
+        rol: usuario.rol
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      mensaje: 'Login exitoso',
+      token,
+      usuario: {
+        id_usuario: usuario.id_usuario,
+        nombre: usuario.nombre,
+        correo: usuario.correo,
+        rol: usuario.rol
+      }
+    });
+  } catch (error) {
+    console.error('Error en login:', error);
+    res.status(500).json({ error: 'Error en el servidor' });
+  }
+});
+
+module.exports = router;
