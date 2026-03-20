@@ -12,10 +12,10 @@ const pagoRoutes = require('./Routes/PagoRoutes');
 
 const app = express();
 
-// CORS restringido
+// CORS - fallback a puerto 5173 (Vite dev server)
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization']
 };
 app.use(cors(corsOptions));
@@ -55,6 +55,7 @@ const PORT = process.env.PORT || 4000;
       console.log(`   GET  /api/productos                - Listar productos`);
       console.log(`   POST /api/productos                - Crear producto`);
       console.log(`   PUT  /api/productos/:id/estado     - Aprobar/rechazar producto`);
+      console.log(`   PUT  /api/productos/:id            - Editar producto`);
       console.log(`   DELETE /api/productos/:id          - Eliminar producto`);
       console.log(`   POST /api/pedidos                  - Crear pedido`);
       console.log(`   GET  /api/pedidos/mis-pedidos      - Mis pedidos`);

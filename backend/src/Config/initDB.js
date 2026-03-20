@@ -1,7 +1,7 @@
 const mysql = require('mysql2/promise');
 const fs = require('fs');
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '../../..', '.env') });
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 
 // Conexión inicial sin especificar database
 const createPoolConnection = () => {
@@ -22,7 +22,7 @@ const initializeDatabase = async () => {
     connection = await pool.getConnection();
 
     // Leer el archivo SQL
-    const sqlPath = path.join(__dirname, '../../..', 'SQL', 'MARKETPUTUMAYOSQL.sql');
+    const sqlPath = path.join(__dirname, '../../../SQL', 'MARKETPUTUMAYOSQL.sql');
     const sqlScript = fs.readFileSync(sqlPath, 'utf8');
 
     // Separar las queries por punto y coma
@@ -33,12 +33,10 @@ const initializeDatabase = async () => {
 
     console.log('📊 Inicializando base de datos...');
 
-    // Ejecutar cada query con query() en lugar de execute()
     for (const query of queries) {
       try {
         await connection.query(query);
       } catch (err) {
-        // Ignorar errores si la tabla ya existe
         if (!err.message.includes('already exists')) {
           throw err;
         }
