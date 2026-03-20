@@ -9,15 +9,26 @@ router.post('/registro', async (req, res) => {
   try {
     const { nombre, correo, password, rol, telefono, municipio } = req.body;
 
-    // Validar datos
+    // Validar datos requeridos
     if (!nombre || !correo || !password || !rol) {
       return res.status(400).json({ error: 'Faltan datos requeridos' });
     }
 
-    // Validar que el rol sea válido
-    const rolesValidos = ['ADMIN', 'PRODUCTOR', 'COMPRADOR'];
+    // Validar formato de correo
+    const correoRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!correoRegex.test(correo)) {
+      return res.status(400).json({ error: 'Formato de correo inválido' });
+    }
+
+    // Validar longitud de contraseña
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+    }
+
+    // Solo PRODUCTOR y COMPRADOR pueden registrarse públicamente
+    const rolesValidos = ['PRODUCTOR', 'COMPRADOR'];
     if (!rolesValidos.includes(rol)) {
-      return res.status(400).json({ error: 'Rol inválido' });
+      return res.status(400).json({ error: 'Rol inválido. Solo puedes registrarte como PRODUCTOR o COMPRADOR' });
     }
 
     // Verificar si el correo ya existe
@@ -61,7 +72,7 @@ router.post('/login', async (req, res) => {
 
     // Buscar usuario
     const [usuarios] = await pool.query(
-      'SELECT id_usuario, nombre, correo, password_hash, rol FROM usuarios WHERE correo = ?',
+      'SELECT id_usuario, nombre, correo, password_hash, rol, activo FROM usuarios WHERE correo = ?',
       [correo]
     );
 
@@ -70,6 +81,11 @@ router.post('/login', async (req, res) => {
     }
 
     const usuario = usuarios[0];
+
+    // Verificar si el usuario está activo
+    if (!usuario.activo) {
+      return res.status(403).json({ error: 'Tu cuenta ha sido desactivada. Contacta al administrador.' });
+    }
 
     // Verificar contraseña
     const passwordValida = await bcrypt.compare(password, usuario.password_hash);
