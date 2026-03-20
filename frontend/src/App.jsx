@@ -6,6 +6,7 @@ import Registro from './pages/Registro';
 import Catalogo from './pages/Catalogo';
 import Carrito from './pages/Carrito';
 import Admin from './pages/Admin';
+import Productor from './pages/Productor';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
           <Route path="/catalogo" element={<Catalogo />} />
           <Route path="/carrito" element={<Carrito />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/productor" element={<Productor />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
