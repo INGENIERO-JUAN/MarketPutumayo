@@ -11,7 +11,7 @@ const Productor = () => {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [mensaje, setMensaje] = useState('');
-  const [form, setForm] = useState({ nombre: '', descripcion: '', precio: '', stock: '', id_categoria: '', imagen_url: '' });
+  const [form, setForm] = useState({ nombre: '', descripcion: '', precio: '', stock: '', id_categoria: '' });
 
   useEffect(() => {
     if (!usuario || usuario.rol !== 'PRODUCTOR') { navigate('/catalogo'); return; }
@@ -51,7 +51,7 @@ const Productor = () => {
         id_categoria: parseInt(form.id_categoria)
       });
       setMensaje('✅ Producto enviado para aprobación');
-      setForm({ nombre: '', descripcion: '', precio: '', stock: '', id_categoria: '', imagen_url: '' });
+      setForm({ nombre: '', descripcion: '', precio: '', stock: '', id_categoria: '' });
       setMostrarForm(false);
       cargarMisProductos();
     } catch (error) {
@@ -76,14 +76,16 @@ const Productor = () => {
         </button>
       </div>
 
-      {mensaje && <div style={mensaje.startsWith('✅') ? styles.exito : styles.error}>{mensaje}</div>}
+      {mensaje && (
+        <div style={mensaje.startsWith('✅') ? styles.exito : styles.error}>{mensaje}</div>
+      )}
 
       {mostrarForm && (
         <div style={styles.formBox}>
           <h3 style={styles.formTitle}>Publicar nuevo producto</h3>
           <form onSubmit={handleSubmit}>
             <input style={styles.input} type="text" name="nombre" placeholder="Nombre del producto" value={form.nombre} onChange={handleChange} required />
-            <textarea style={styles.textarea} name="descripcion" placeholder="Descripción del producto" value={form.descripcion} onChange={handleChange} rows={3} />
+            <textarea style={styles.textarea} name="descripcion" placeholder="Descripción" value={form.descripcion} onChange={handleChange} rows={3} />
             <div style={styles.row}>
               <input style={styles.inputMitad} type="number" name="precio" placeholder="Precio ($)" value={form.precio} onChange={handleChange} min="0" required />
               <input style={styles.inputMitad} type="number" name="stock" placeholder="Stock (unidades)" value={form.stock} onChange={handleChange} min="0" required />
@@ -94,10 +96,6 @@ const Productor = () => {
                 <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>
               ))}
             </select>
-            <input style={styles.input} type="url" name="imagen_url" placeholder="URL de imagen (opcional) ej: https://..." value={form.imagen_url} onChange={handleChange} />
-            {form.imagen_url && (
-              <img src={form.imagen_url} alt="preview" style={styles.preview} onError={(e) => e.target.style.display = 'none'} />
-            )}
             <button style={styles.btnSubmit} type="submit" disabled={cargando}>
               {cargando ? 'Publicando...' : 'Publicar producto'}
             </button>
@@ -111,11 +109,7 @@ const Productor = () => {
         <div style={styles.grid}>
           {productos.map(p => (
             <div key={p.id_producto} style={styles.card}>
-              {p.imagen_url ? (
-                <img src={p.imagen_url} alt={p.nombre} style={styles.img} onError={(e) => { e.target.style.display='none'; }} />
-              ) : (
-                <div style={styles.imgPlaceholder}>🌿</div>
-              )}
+              <div style={styles.imgPlaceholder}>🌿</div>
               <span style={{ ...styles.estado, color: colorEstado(p.estado) }}>● {p.estado}</span>
               <h3 style={styles.nombre}>{p.nombre}</h3>
               <p style={styles.desc}>{p.descripcion}</p>
@@ -142,11 +136,9 @@ const styles = {
   row: { display: 'flex', gap: '1rem' },
   inputMitad: { flex: 1, padding: '0.75rem', marginBottom: '1rem', border: '1px solid #ddd', borderRadius: '8px', fontSize: '1rem' },
   btnSubmit: { width: '100%', padding: '0.75rem', background: '#f4a226', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', cursor: 'pointer', fontWeight: 'bold' },
-  preview: { width: '100%', height: '150px', objectFit: 'cover', borderRadius: '8px', marginBottom: '1rem' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1.5rem' },
   card: { background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 2px 10px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', gap: '0.4rem' },
   imgPlaceholder: { fontSize: '3rem', textAlign: 'center', background: '#f0f4f0', borderRadius: '8px', padding: '1rem' },
-  img: { width: '100%', height: '150px', objectFit: 'cover', borderRadius: '8px' },
   estado: { fontWeight: 'bold', fontSize: '0.85rem' },
   nombre: { color: '#1a472a', margin: 0 },
   desc: { color: '#666', fontSize: '0.9rem', margin: 0 },
