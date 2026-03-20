@@ -15,7 +15,13 @@ const Navbar = () => {
       <Link to="/" style={styles.logo}>🌿 MarketPutumayo</Link>
       <div style={styles.links}>
         <Link to="/catalogo" style={styles.link}>Catálogo</Link>
-        {usuario && <Link to="/carrito" style={styles.link}>🛒 Carrito</Link>}
+        {usuario?.rol === 'COMPRADOR' && (
+          <>
+            <Link to="/carrito" style={styles.link}>🛒 Carrito</Link>
+            <Link to="/mis-pedidos" style={styles.link}>📋 Mis Pedidos</Link>
+          </>
+        )}
+        {usuario?.rol === 'PRODUCTOR' && <Link to="/productor" style={styles.link}>📦 Mis Productos</Link>}
         {usuario?.rol === 'ADMIN' && <Link to="/admin" style={styles.link}>⚙️ Admin</Link>}
         {usuario ? (
           <>
