@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import API from '../api/axios';
 
 const MisPedidos = () => {
-  const { usuario } = useAuth();
   const navigate = useNavigate();
   const [pedidos, setPedidos] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -77,4 +75,5 @@ const styles = {
   itemDetalle: { color: '#999' },
   loading: { textAlign: 'center', padding: '3rem', color: '#666' },
 };
+
 export default MisPedidos;
