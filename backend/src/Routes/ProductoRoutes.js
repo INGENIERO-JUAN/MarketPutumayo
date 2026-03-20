@@ -8,7 +8,7 @@ router.get('/', async (req, res) => {
   try {
     const [productos] = await pool.query(
       `SELECT p.id_producto, p.nombre, p.descripcion, p.precio, p.stock, 
-              p.imagen_url, p.estado, c.nombre AS categoria, u.nombre AS productor
+              p.estado, c.nombre AS categoria, u.nombre AS productor
        FROM productos p
        JOIN categorias c ON p.id_categoria = c.id_categoria
        JOIN usuarios u ON p.id_productor = u.id_usuario
@@ -27,7 +27,7 @@ router.get('/mis-productos', verificarToken, verificarRol('PRODUCTOR'), async (r
   try {
     const [productos] = await pool.query(
       `SELECT p.id_producto, p.nombre, p.descripcion, p.precio, p.stock,
-              p.imagen_url, p.estado, c.nombre AS categoria
+              p.estado, c.nombre AS categoria
        FROM productos p
        JOIN categorias c ON p.id_categoria = c.id_categoria
        WHERE p.id_productor = ?
@@ -63,7 +63,7 @@ router.get('/pendientes', verificarToken, verificarRol('ADMIN'), async (req, res
 // POST /api/productos - Crear producto (solo PRODUCTOR)
 router.post('/', verificarToken, verificarRol('PRODUCTOR'), async (req, res) => {
   try {
-    const { nombre, descripcion, precio, stock, id_categoria, imagen_url } = req.body;
+    const { nombre, descripcion, precio, stock, id_categoria } = req.body;
 
     if (!nombre || !precio || !stock || !id_categoria) {
       return res.status(400).json({ error: 'Faltan datos requeridos' });
@@ -74,9 +74,9 @@ router.post('/', verificarToken, verificarRol('PRODUCTOR'), async (req, res) => 
     }
 
     const [resultado] = await pool.query(
-      `INSERT INTO productos (id_productor, id_categoria, nombre, descripcion, precio, stock, imagen_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [req.usuario.id_usuario, id_categoria, nombre, descripcion || null, precio, stock, imagen_url || null]
+      `INSERT INTO productos (id_productor, id_categoria, nombre, descripcion, precio, stock)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [req.usuario.id_usuario, id_categoria, nombre, descripcion || null, precio, stock]
     );
 
     res.status(201).json({
@@ -127,7 +127,6 @@ router.delete('/:id', verificarToken, verificarRol('PRODUCTOR', 'ADMIN'), async 
       return res.status(404).json({ error: 'Producto no encontrado' });
     }
 
-    // Solo el dueño o un admin puede eliminar
     if (req.usuario.rol !== 'ADMIN' && productos[0].id_productor !== req.usuario.id_usuario) {
       return res.status(403).json({ error: 'No tienes permiso para eliminar este producto' });
     }
