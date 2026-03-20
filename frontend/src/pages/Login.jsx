@@ -9,6 +9,7 @@ const Login = () => {
   const [form, setForm] = useState({ correo: '', password: '' });
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
+  const [verPassword, setVerPassword] = useState(false);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -35,7 +36,12 @@ const Login = () => {
         {error && <div style={styles.error}>{error}</div>}
         <form onSubmit={handleSubmit}>
           <input style={styles.input} type="email" name="correo" placeholder="Correo electrónico" value={form.correo} onChange={handleChange} required />
-          <input style={styles.input} type="password" name="password" placeholder="Contraseña" value={form.password} onChange={handleChange} required />
+          <div style={styles.passwordBox}>
+            <input style={styles.inputPassword} type={verPassword ? 'text' : 'password'} name="password" placeholder="Contraseña" value={form.password} onChange={handleChange} required />
+            <button type="button" style={styles.ojito} onClick={() => setVerPassword(!verPassword)}>
+              {verPassword ? '🙈' : '👁️'}
+            </button>
+          </div>
           <button style={styles.btn} type="submit" disabled={cargando}>
             {cargando ? 'Ingresando...' : 'Ingresar'}
           </button>
@@ -52,6 +58,9 @@ const styles = {
   title: { textAlign: 'center', color: '#1a472a', marginBottom: '0.3rem' },
   subtitle: { textAlign: 'center', color: '#666', marginBottom: '1.5rem' },
   input: { width: '100%', padding: '0.75rem', marginBottom: '1rem', border: '1px solid #ddd', borderRadius: '8px', fontSize: '1rem', boxSizing: 'border-box' },
+  passwordBox: { position: 'relative', marginBottom: '1rem' },
+  inputPassword: { width: '100%', padding: '0.75rem', paddingRight: '3rem', border: '1px solid #ddd', borderRadius: '8px', fontSize: '1rem', boxSizing: 'border-box' },
+  ojito: { position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.1rem' },
   btn: { width: '100%', padding: '0.75rem', background: '#1a472a', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', cursor: 'pointer' },
   error: { background: '#fee', color: '#c00', padding: '0.75rem', borderRadius: '8px', marginBottom: '1rem', textAlign: 'center' },
   footer: { textAlign: 'center', marginTop: '1rem', color: '#666' },
