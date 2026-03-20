@@ -9,62 +9,30 @@ const MisPedidos = () => {
   const [pedidos, setPedidos] = useState([]);
   const [cargando, setCargando] = useState(true);
 
-  useEffect(() => {
-    if (!usuario) { navigate('/login'); return; }
-    cargarPedidos();
-  }, []);
+  useEffect(() => { cargarPedidos(); }, []);
 
   const cargarPedidos = async () => {
     try {
       const { data } = await API.get('/pedidos/mis-pedidos');
-      // Agrupar por id_pedido
       const agrupados = data.reduce((acc, item) => {
-        if (!acc[item.id_pedido]) {
-          acc[item.id_pedido] = {
-            id_pedido: item.id_pedido,
-            total: item.total,
-            estado: item.estado,
-            fecha: item.fecha,
-            items: []
-          };
-        }
-        acc[item.id_pedido].items.push({
-          producto: item.producto,
-          cantidad: item.cantidad,
-          precio_unitario: item.precio_unitario
-        });
+        if (!acc[item.id_pedido]) acc[item.id_pedido] = { id_pedido: item.id_pedido, total: item.total, estado: item.estado, fecha: item.fecha, items: [] };
+        acc[item.id_pedido].items.push({ producto: item.producto, cantidad: item.cantidad, precio_unitario: item.precio_unitario });
         return acc;
       }, {});
       setPedidos(Object.values(agrupados));
-    } catch (error) {
-      console.error('Error al cargar pedidos:', error);
-    } finally {
-      setCargando(false);
-    }
+    } catch (error) { console.error('Error al cargar pedidos:', error); }
+    finally { setCargando(false); }
   };
 
-  const colorEstado = (estado) => {
-    const colores = {
-      PENDIENTE: '#f4a226',
-      PAGADO: '#1a472a',
-      ENVIADO: '#3182ce',
-      ENTREGADO: '#38a169',
-      CANCELADO: '#e53e3e'
-    };
-    return colores[estado] || '#666';
-  };
+  const colorEstado = (estado) => ({ PENDIENTE: '#f4a226', PAGADO: '#1a472a', ENVIADO: '#3182ce', ENTREGADO: '#38a169', CANCELADO: '#e53e3e' }[estado] || '#666');
 
   if (cargando) return <div style={styles.loading}>Cargando pedidos...</div>;
 
   return (
     <div style={styles.container}>
       <h2 style={styles.title}>📋 Mis Pedidos</h2>
-
       {pedidos.length === 0 ? (
-        <div style={styles.vacio}>
-          <p>No tienes pedidos aún</p>
-          <button style={styles.btn} onClick={() => navigate('/catalogo')}>Ver Catálogo</button>
-        </div>
+        <div style={styles.vacio}><p>No tienes pedidos aún</p><button style={styles.btn} onClick={() => navigate('/catalogo')}>Ver Catálogo</button></div>
       ) : (
         pedidos.map(p => (
           <div key={p.id_pedido} style={styles.card}>
@@ -74,9 +42,7 @@ const MisPedidos = () => {
                 <p style={styles.cardFecha}>{new Date(p.fecha).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
               </div>
               <div style={styles.cardDerecha}>
-                <span style={{ ...styles.badge, background: colorEstado(p.estado) + '22', color: colorEstado(p.estado) }}>
-                  {p.estado}
-                </span>
+                <span style={{ ...styles.badge, background: colorEstado(p.estado) + '22', color: colorEstado(p.estado) }}>{p.estado}</span>
                 <p style={styles.total}>${Number(p.total).toLocaleString()}</p>
               </div>
             </div>
@@ -102,8 +68,7 @@ const styles = {
   btn: { background: '#1a472a', color: 'white', border: 'none', padding: '0.6rem 1.5rem', borderRadius: '8px', cursor: 'pointer', marginTop: '1rem' },
   card: { background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.07)', marginBottom: '1rem' },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' },
-  cardTitulo: { margin: 0, color: '#1a472a' },
-  cardFecha: { margin: '0.3rem 0 0', color: '#999', fontSize: '0.85rem' },
+  cardTitulo: { margin: 0, color: '#1a472a' }, cardFecha: { margin: '0.3rem 0 0', color: '#999', fontSize: '0.85rem' },
   cardDerecha: { textAlign: 'right' },
   badge: { padding: '0.3rem 0.8rem', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', display: 'inline-block' },
   total: { margin: '0.5rem 0 0', fontWeight: 'bold', color: '#f4a226', fontSize: '1.1rem' },
@@ -112,5 +77,4 @@ const styles = {
   itemDetalle: { color: '#999' },
   loading: { textAlign: 'center', padding: '3rem', color: '#666' },
 };
-
 export default MisPedidos;
