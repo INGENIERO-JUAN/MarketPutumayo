@@ -1,3 +1,4 @@
+// Página de catálogo de productos - Desarrollado por Jaider
 import { useEffect, useState } from 'react';
 import API from '../api/axios';
 import { useAuth } from '../context/AuthContext';
