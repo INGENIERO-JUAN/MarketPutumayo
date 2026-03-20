@@ -92,17 +92,13 @@ const Catalogo = () => {
         <div style={styles.grid}>
           {productosFiltrados.map(p => (
             <div key={p.id_producto} style={styles.card}>
-              {p.imagen_url ? (
-                <img src={p.imagen_url} alt={p.nombre} style={styles.img} onError={(e) => { e.target.style.display = 'none'; }} />
-              ) : (
-                <div style={styles.imgPlaceholder}>🌿</div>
-              )}
+              <div style={styles.imgPlaceholder}>🌿</div>
               <span style={styles.categoria}>{p.categoria}</span>
               <h3 style={styles.nombre}>{p.nombre}</h3>
               <p style={styles.desc}>{p.descripcion}</p>
               <p style={styles.precio}>${Number(p.precio).toLocaleString()}</p>
               <p style={styles.stock}>Stock: {p.stock} unidades</p>
-              <p style={styles.productor}>🌱 {p.productor}</p>
+              <p style={styles.productor}>Productor: {p.productor}</p>
               {usuario ? (
                 p.stock > 0 ? (
                   <button style={styles.btn} onClick={() => agregarAlCarrito(p)}>
@@ -130,16 +126,15 @@ const styles = {
   select: { flex: 1, padding: '0.75rem', border: '1px solid #ddd', borderRadius: '8px', fontSize: '1rem', minWidth: '200px' },
   resultados: { color: '#999', fontSize: '0.9rem', marginBottom: '1rem' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1.5rem' },
-  card: { background: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', gap: '0.4rem', padding: '0 0 1rem 0' },
-  imgPlaceholder: { fontSize: '3rem', textAlign: 'center', background: '#f0f4f0', padding: '1.5rem' },
-  img: { width: '100%', height: '180px', objectFit: 'cover' },
-  categoria: { background: '#e8f5e9', color: '#1a472a', padding: '0.2rem 0.6rem', borderRadius: '20px', fontSize: '0.75rem', alignSelf: 'flex-start', margin: '0.5rem 1rem 0' },
-  nombre: { color: '#1a472a', margin: '0 1rem' },
-  desc: { color: '#666', fontSize: '0.9rem', margin: '0 1rem' },
-  precio: { color: '#f4a226', fontWeight: 'bold', fontSize: '1.2rem', margin: '0 1rem' },
-  stock: { color: '#999', fontSize: '0.85rem', margin: '0 1rem' },
-  productor: { color: '#888', fontSize: '0.8rem', margin: '0 1rem', fontStyle: 'italic' },
-  btn: { background: '#1a472a', color: 'white', border: 'none', padding: '0.6rem', borderRadius: '8px', cursor: 'pointer', margin: '0.5rem 1rem 0' },
+  card: { background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 2px 10px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', gap: '0.4rem' },
+  imgPlaceholder: { fontSize: '3rem', textAlign: 'center', background: '#f0f4f0', borderRadius: '8px', padding: '1rem' },
+  categoria: { background: '#e8f5e9', color: '#1a472a', padding: '0.2rem 0.6rem', borderRadius: '20px', fontSize: '0.75rem', alignSelf: 'flex-start' },
+  nombre: { color: '#1a472a', margin: 0 },
+  desc: { color: '#666', fontSize: '0.9rem', margin: 0 },
+  precio: { color: '#f4a226', fontWeight: 'bold', fontSize: '1.2rem', margin: 0 },
+  stock: { color: '#999', fontSize: '0.85rem', margin: 0 },
+  productor: { color: '#888', fontSize: '0.8rem', margin: 0, fontStyle: 'italic' },
+  btn: { background: '#1a472a', color: 'white', border: 'none', padding: '0.6rem', borderRadius: '8px', cursor: 'pointer', marginTop: '0.5rem' },
   aviso: { color: '#999', fontSize: '0.85rem', textAlign: 'center' },
   agotado: { color: '#e53e3e', fontSize: '0.85rem', textAlign: 'center' },
   loading: { textAlign: 'center', padding: '3rem', color: '#666' },
