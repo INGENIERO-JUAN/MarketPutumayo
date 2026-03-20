@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const bcrypt = require('bcryptjs');
 const pool = require('../Config/db');
 const { verificarToken, verificarRol } = require('../Middleware/authMiddleware');
 
@@ -43,6 +44,50 @@ router.put('/perfil', verificarToken, async (req, res) => {
   }
 });
 
+// PUT /api/usuarios/cambiar-password - Cambiar contraseña propia
+router.put('/cambiar-password', verificarToken, async (req, res) => {
+  try {
+    const { passwordActual, passwordNueva } = req.body;
+
+    if (!passwordActual || !passwordNueva) {
+      return res.status(400).json({ error: 'Faltan datos requeridos' });
+    }
+
+    if (passwordNueva.length < 6) {
+      return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' });
+    }
+
+    // Obtener contraseña actual del usuario
+    const [usuarios] = await pool.query(
+      'SELECT password_hash FROM usuarios WHERE id_usuario = ?',
+      [req.usuario.id_usuario]
+    );
+
+    if (usuarios.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    // Verificar contraseña actual
+    const passwordValida = await bcrypt.compare(passwordActual, usuarios[0].password_hash);
+    if (!passwordValida) {
+      return res.status(401).json({ error: 'La contraseña actual es incorrecta' });
+    }
+
+    // Encriptar nueva contraseña
+    const hashedPassword = await bcrypt.hash(passwordNueva, 10);
+
+    await pool.query(
+      'UPDATE usuarios SET password_hash = ? WHERE id_usuario = ?',
+      [hashedPassword, req.usuario.id_usuario]
+    );
+
+    res.json({ mensaje: 'Contraseña actualizada exitosamente' });
+  } catch (error) {
+    console.error('Error al cambiar contraseña:', error);
+    res.status(500).json({ error: 'Error en el servidor' });
+  }
+});
+
 // GET /api/usuarios - Listar todos los usuarios (solo ADMIN)
 router.get('/', verificarToken, verificarRol('ADMIN'), async (req, res) => {
   try {
@@ -65,7 +110,6 @@ router.put('/:id/estado', verificarToken, verificarRol('ADMIN'), async (req, res
       return res.status(400).json({ error: 'El campo activo debe ser true o false' });
     }
 
-    // No puede desactivarse a sí mismo
     if (req.usuario.id_usuario === parseInt(req.params.id)) {
       return res.status(400).json({ error: 'No puedes desactivar tu propia cuenta' });
     }
