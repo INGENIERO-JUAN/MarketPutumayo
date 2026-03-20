@@ -7,8 +7,8 @@ const { verificarToken, verificarRol } = require('../Middleware/authMiddleware')
 router.get('/', async (req, res) => {
   try {
     const [productos] = await pool.query(
-      `SELECT p.id_producto, p.nombre, p.descripcion, p.precio, p.stock, 
-              p.estado, c.nombre AS categoria, u.nombre AS productor
+      `SELECT p.id_producto, p.nombre, p.descripcion, p.precio, p.stock,
+              p.estado, p.imagen_url, c.nombre AS categoria, u.nombre AS productor
        FROM productos p
        JOIN categorias c ON p.id_categoria = c.id_categoria
        JOIN usuarios u ON p.id_productor = u.id_usuario
@@ -27,7 +27,7 @@ router.get('/mis-productos', verificarToken, verificarRol('PRODUCTOR'), async (r
   try {
     const [productos] = await pool.query(
       `SELECT p.id_producto, p.nombre, p.descripcion, p.precio, p.stock,
-              p.estado, c.nombre AS categoria
+              p.estado, p.imagen_url, c.nombre AS categoria
        FROM productos p
        JOIN categorias c ON p.id_categoria = c.id_categoria
        WHERE p.id_productor = ?
@@ -46,7 +46,7 @@ router.get('/pendientes', verificarToken, verificarRol('ADMIN'), async (req, res
   try {
     const [productos] = await pool.query(
       `SELECT p.id_producto, p.nombre, p.descripcion, p.precio, p.stock,
-              p.estado, c.nombre AS categoria, u.nombre AS productor
+              p.estado, p.imagen_url, c.nombre AS categoria, u.nombre AS productor
        FROM productos p
        JOIN categorias c ON p.id_categoria = c.id_categoria
        JOIN usuarios u ON p.id_productor = u.id_usuario
@@ -60,12 +60,35 @@ router.get('/pendientes', verificarToken, verificarRol('ADMIN'), async (req, res
   }
 });
 
+// GET /api/productos/:id - Ver detalle de un producto
+router.get('/:id', async (req, res) => {
+  try {
+    const [productos] = await pool.query(
+      `SELECT p.id_producto, p.nombre, p.descripcion, p.precio, p.stock,
+              p.estado, p.imagen_url, p.creado_en,
+              c.nombre AS categoria, u.nombre AS productor, u.telefono AS telefono_productor
+       FROM productos p
+       JOIN categorias c ON p.id_categoria = c.id_categoria
+       JOIN usuarios u ON p.id_productor = u.id_usuario
+       WHERE p.id_producto = ?`,
+      [req.params.id]
+    );
+    if (productos.length === 0) {
+      return res.status(404).json({ error: 'Producto no encontrado' });
+    }
+    res.json(productos[0]);
+  } catch (error) {
+    console.error('Error al obtener producto:', error);
+    res.status(500).json({ error: 'Error en el servidor' });
+  }
+});
+
 // POST /api/productos - Crear producto (solo PRODUCTOR)
 router.post('/', verificarToken, verificarRol('PRODUCTOR'), async (req, res) => {
   try {
-    const { nombre, descripcion, precio, stock, id_categoria } = req.body;
+    const { nombre, descripcion, precio, stock, id_categoria, imagen_url } = req.body;
 
-    if (!nombre || !precio || !stock || !id_categoria) {
+    if (!nombre || !precio || stock === undefined || !id_categoria) {
       return res.status(400).json({ error: 'Faltan datos requeridos' });
     }
 
@@ -74,9 +97,9 @@ router.post('/', verificarToken, verificarRol('PRODUCTOR'), async (req, res) => 
     }
 
     const [resultado] = await pool.query(
-      `INSERT INTO productos (id_productor, id_categoria, nombre, descripcion, precio, stock)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [req.usuario.id_usuario, id_categoria, nombre, descripcion || null, precio, stock]
+      `INSERT INTO productos (id_productor, id_categoria, nombre, descripcion, precio, stock, imagen_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [req.usuario.id_usuario, id_categoria, nombre, descripcion || null, precio, stock, imagen_url || null]
     );
 
     res.status(201).json({
@@ -89,11 +112,52 @@ router.post('/', verificarToken, verificarRol('PRODUCTOR'), async (req, res) => 
   }
 });
 
+// PUT /api/productos/:id - Editar producto (PRODUCTOR dueño)
+router.put('/:id', verificarToken, verificarRol('PRODUCTOR'), async (req, res) => {
+  try {
+    const { nombre, descripcion, precio, stock, id_categoria, imagen_url } = req.body;
+
+    // Verificar que el producto pertenece al productor
+    const [productos] = await pool.query(
+      'SELECT id_productor FROM productos WHERE id_producto = ?',
+      [req.params.id]
+    );
+
+    if (productos.length === 0) {
+      return res.status(404).json({ error: 'Producto no encontrado' });
+    }
+
+    if (productos[0].id_productor !== req.usuario.id_usuario) {
+      return res.status(403).json({ error: 'No tienes permiso para editar este producto' });
+    }
+
+    if (!nombre || !precio || stock === undefined || !id_categoria) {
+      return res.status(400).json({ error: 'Faltan datos requeridos' });
+    }
+
+    if (precio < 0 || stock < 0) {
+      return res.status(400).json({ error: 'Precio y stock deben ser positivos' });
+    }
+
+    await pool.query(
+      `UPDATE productos
+       SET nombre = ?, descripcion = ?, precio = ?, stock = ?, id_categoria = ?, imagen_url = ?, estado = 'PENDIENTE'
+       WHERE id_producto = ?`,
+      [nombre, descripcion || null, precio, stock, id_categoria, imagen_url || null, req.params.id]
+    );
+
+    res.json({ mensaje: 'Producto actualizado exitosamente. Pendiente de aprobación.' });
+  } catch (error) {
+    console.error('Error al editar producto:', error);
+    res.status(500).json({ error: 'Error en el servidor' });
+  }
+});
+
 // PUT /api/productos/:id/estado - Aprobar o rechazar producto (solo ADMIN)
 router.put('/:id/estado', verificarToken, verificarRol('ADMIN'), async (req, res) => {
   try {
     const { estado } = req.body;
-    const estadosValidos = ['APROBADO', 'RECHAZADO'];
+    const estadosValidos = ['APROBADO', 'RECHAZADO', 'PENDIENTE'];
 
     if (!estadosValidos.includes(estado)) {
       return res.status(400).json({ error: 'Estado inválido' });
