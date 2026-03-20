@@ -60,7 +60,7 @@ router.get('/pendientes', verificarToken, verificarRol('ADMIN'), async (req, res
   }
 });
 
-// GET /api/productos/:id - Ver detalle de un producto
+// GET /api/productos/:id - Ver detalle (solo productos APROBADOS públicamente)
 router.get('/:id', async (req, res) => {
   try {
     const [productos] = await pool.query(
@@ -70,7 +70,7 @@ router.get('/:id', async (req, res) => {
        FROM productos p
        JOIN categorias c ON p.id_categoria = c.id_categoria
        JOIN usuarios u ON p.id_productor = u.id_usuario
-       WHERE p.id_producto = ?`,
+       WHERE p.id_producto = ? AND p.estado = 'APROBADO'`,
       [req.params.id]
     );
     if (productos.length === 0) {
@@ -117,7 +117,6 @@ router.put('/:id', verificarToken, verificarRol('PRODUCTOR'), async (req, res) =
   try {
     const { nombre, descripcion, precio, stock, id_categoria, imagen_url } = req.body;
 
-    // Verificar que el producto pertenece al productor
     const [productos] = await pool.query(
       'SELECT id_productor FROM productos WHERE id_producto = ?',
       [req.params.id]
