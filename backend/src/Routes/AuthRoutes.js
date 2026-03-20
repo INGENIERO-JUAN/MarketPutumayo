@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const db = require('../Config/db');
+const pool = require('../Config/db');
 
 // REGISTRO
 router.post('/registro', async (req, res) => {
@@ -21,7 +21,7 @@ router.post('/registro', async (req, res) => {
     }
 
     // Verificar si el correo ya existe
-    const [usuarioExistente] = await db.promise().query(
+    const [usuarioExistente] = await pool.query(
       'SELECT id_usuario FROM usuarios WHERE correo = ?',
       [correo]
     );
@@ -34,7 +34,7 @@ router.post('/registro', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Insertar usuario
-    const [resultado] = await db.promise().query(
+    const [resultado] = await pool.query(
       'INSERT INTO usuarios (nombre, correo, password_hash, rol, telefono, municipio) VALUES (?, ?, ?, ?, ?, ?)',
       [nombre, correo, hashedPassword, rol, telefono || null, municipio || null]
     );
@@ -60,7 +60,7 @@ router.post('/login', async (req, res) => {
     }
 
     // Buscar usuario
-    const [usuarios] = await db.promise().query(
+    const [usuarios] = await pool.query(
       'SELECT id_usuario, nombre, correo, password_hash, rol FROM usuarios WHERE correo = ?',
       [correo]
     );
@@ -78,7 +78,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
 
-    // Generar token
+    // Generar token (1 día de duración)
     const token = jwt.sign(
       {
         id_usuario: usuario.id_usuario,
@@ -87,7 +87,7 @@ router.post('/login', async (req, res) => {
         rol: usuario.rol
       },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '1d' }
     );
 
     res.json({
