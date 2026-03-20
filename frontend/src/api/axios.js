@@ -4,7 +4,6 @@ const API = axios.create({
   baseURL: 'http://localhost:4000/api',
 });
 
-// Agregar token automáticamente a cada request
 API.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -12,5 +11,22 @@ API.interceptors.request.use((config) => {
   }
   return config;
 });
+
+API.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      const esRutaPublica = ['/auth/login', '/auth/registro'].some(ruta =>
+        error.config?.url?.includes(ruta)
+      );
+      if (!esRutaPublica) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('usuario');
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 export default API;
