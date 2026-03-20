@@ -49,3 +49,4 @@ src/
 - **ADMIN** - Gestiona usuarios, productos y pedidos
 - **PRODUCTOR** - Publica y gestiona sus productos
 - **COMPRADOR** - Explora el catálogo y realiza pedidos
+
