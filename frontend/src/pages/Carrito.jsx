@@ -14,13 +14,15 @@ const Carrito = () => {
   const [mensaje, setMensaje] = useState('');
 
   useEffect(() => {
-    if (!usuario) { navigate('/login'); return; }
     const data = JSON.parse(localStorage.getItem('carrito') || '[]');
     setCarrito(data);
-  }, []);
+  }, [usuario, navigate]);
 
   const actualizar = (id, cantidad) => {
-    const nuevo = carrito.map(p => p.id_producto === id ? { ...p, cantidad: Math.max(1, cantidad) } : p);
+    const producto = carrito.find(p => p.id_producto === id);
+    if (!producto) return;
+    const cantidadValida = Math.min(Math.max(1, cantidad), producto.stock);
+    const nuevo = carrito.map(p => p.id_producto === id ? { ...p, cantidad: cantidadValida } : p);
     setCarrito(nuevo);
     localStorage.setItem('carrito', JSON.stringify(nuevo));
   };
@@ -39,6 +41,7 @@ const Carrito = () => {
       return;
     }
     setCargando(true);
+    setMensaje('');
     try {
       const items = carrito.map(p => ({ id_producto: p.id_producto, cantidad: p.cantidad }));
       const { data: pedido } = await API.post('/pedidos', { items, direccion_entrega: direccion });
@@ -78,11 +81,20 @@ const Carrito = () => {
               <div style={styles.info}>
                 <h4 style={styles.nombre}>{p.nombre}</h4>
                 <p style={styles.precio}>${Number(p.precio).toLocaleString()} c/u</p>
+                <p style={styles.stockDisp}>Stock disponible: {p.stock}</p>
               </div>
               <div style={styles.controles}>
-                <button style={styles.btnNum} onClick={() => actualizar(p.id_producto, p.cantidad - 1)}>-</button>
+                <button
+                  style={styles.btnNum}
+                  onClick={() => actualizar(p.id_producto, p.cantidad - 1)}
+                  disabled={p.cantidad <= 1}
+                >-</button>
                 <span style={styles.cantidad}>{p.cantidad}</span>
-                <button style={styles.btnNum} onClick={() => actualizar(p.id_producto, p.cantidad + 1)}>+</button>
+                <button
+                  style={{ ...styles.btnNum, opacity: p.cantidad >= p.stock ? 0.4 : 1 }}
+                  onClick={() => actualizar(p.id_producto, p.cantidad + 1)}
+                  disabled={p.cantidad >= p.stock}
+                >+</button>
                 <button style={styles.btnEliminar} onClick={() => eliminar(p.id_producto)}>🗑️</button>
               </div>
               <p style={styles.subtotal}>${(p.precio * p.cantidad).toLocaleString()}</p>
@@ -130,10 +142,11 @@ const styles = {
   container: { padding: '2rem', maxWidth: '800px', margin: '0 auto' },
   title: { color: '#1a472a', marginBottom: '1.5rem' },
   vacio: { textAlign: 'center', padding: '3rem', color: '#666' },
-  item: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'white', padding: '1rem 1.5rem', borderRadius: '10px', marginBottom: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.07)' },
+  item: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'white', padding: '1rem 1.5rem', borderRadius: '10px', marginBottom: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.07)', flexWrap: 'wrap', gap: '0.5rem' },
   info: { flex: 1 },
   nombre: { margin: 0, color: '#1a472a' },
   precio: { margin: 0, color: '#999', fontSize: '0.9rem' },
+  stockDisp: { margin: '0.2rem 0 0', color: '#bbb', fontSize: '0.78rem' },
   controles: { display: 'flex', alignItems: 'center', gap: '0.5rem' },
   btnNum: { background: '#e8f5e9', border: 'none', width: '30px', height: '30px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' },
   cantidad: { minWidth: '30px', textAlign: 'center', fontWeight: 'bold' },
