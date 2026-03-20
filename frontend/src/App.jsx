@@ -7,6 +7,7 @@ import Catalogo from './pages/Catalogo';
 import Carrito from './pages/Carrito';
 import Admin from './pages/Admin';
 import Productor from './pages/Productor';
+import MisPedidos from './pages/MisPedidos';
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
           <Route path="/carrito" element={<Carrito />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/productor" element={<Productor />} />
+          <Route path="/mis-pedidos" element={<MisPedidos />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
