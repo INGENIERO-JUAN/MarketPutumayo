@@ -15,7 +15,6 @@ router.post('/', verificarToken, verificarRol('COMPRADOR'), async (req, res) => 
 
     await connection.beginTransaction();
 
-    // Calcular total y verificar stock
     let total = 0;
     for (const item of items) {
       const [productos] = await connection.query(
@@ -36,13 +35,11 @@ router.post('/', verificarToken, verificarRol('COMPRADOR'), async (req, res) => 
       total += productos[0].precio * item.cantidad;
     }
 
-    // Crear pedido
     const [pedido] = await connection.query(
       'INSERT INTO pedidos (id_comprador, total, direccion_entrega, notas) VALUES (?, ?, ?, ?)',
       [req.usuario.id_usuario, total, direccion_entrega || null, notas || null]
     );
 
-    // Insertar detalle del pedido y descontar stock
     for (const item of items) {
       const [productos] = await connection.query(
         'SELECT precio FROM productos WHERE id_producto = ?',
@@ -93,6 +90,55 @@ router.get('/mis-pedidos', verificarToken, verificarRol('COMPRADOR'), async (req
     res.json(pedidos);
   } catch (error) {
     console.error('Error al listar mis pedidos:', error);
+    res.status(500).json({ error: 'Error en el servidor' });
+  }
+});
+
+// GET /api/pedidos/mis-ventas - Ver pedidos recibidos para el productor
+router.get('/mis-ventas', verificarToken, verificarRol('PRODUCTOR'), async (req, res) => {
+  try {
+    const [ventas] = await pool.query(
+      `SELECT 
+        p.id_pedido,
+        p.estado,
+        p.fecha,
+        p.direccion_entrega,
+        u.nombre AS comprador,
+        dp.cantidad,
+        dp.precio_unitario,
+        pr.nombre AS producto
+       FROM pedidos p
+       JOIN detalle_pedido dp ON p.id_pedido = dp.id_pedido
+       JOIN productos pr ON dp.id_producto = pr.id_producto
+       JOIN usuarios u ON p.id_comprador = u.id_usuario
+       WHERE pr.id_productor = ?
+       ORDER BY p.fecha DESC`,
+      [req.usuario.id_usuario]
+    );
+
+    // Agrupar por pedido
+    const agrupados = ventas.reduce((acc, item) => {
+      if (!acc[item.id_pedido]) {
+        acc[item.id_pedido] = {
+          id_pedido: item.id_pedido,
+          estado: item.estado,
+          fecha: item.fecha,
+          direccion_entrega: item.direccion_entrega,
+          comprador: item.comprador,
+          items: []
+        };
+      }
+      acc[item.id_pedido].items.push({
+        producto: item.producto,
+        cantidad: item.cantidad,
+        precio_unitario: item.precio_unitario
+      });
+      return acc;
+    }, {});
+
+    res.json(Object.values(agrupados));
+  } catch (error) {
+    console.error('Error al listar ventas:', error);
     res.status(500).json({ error: 'Error en el servidor' });
   }
 });
