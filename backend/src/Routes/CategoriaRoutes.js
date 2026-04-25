@@ -7,7 +7,7 @@ const { verificarToken, verificarRol } = require('../Middleware/authMiddleware')
 router.get('/', async (req, res) => {
   try {
     const [categorias] = await pool.query(
-      'SELECT id_categoria, nombre, descripcion FROM categorias WHERE activo = TRUE ORDER BY nombre'
+      'SELECT id_categoria, nombre FROM categorias ORDER BY nombre'
     );
     res.json(categorias);
   } catch (error) {
@@ -19,15 +19,15 @@ router.get('/', async (req, res) => {
 // POST /api/categorias - Crear categoría (solo ADMIN)
 router.post('/', verificarToken, verificarRol('ADMIN'), async (req, res) => {
   try {
-    const { nombre, descripcion } = req.body;
+    const { nombre } = req.body;
 
     if (!nombre) {
       return res.status(400).json({ error: 'El nombre es requerido' });
     }
 
     const [resultado] = await pool.query(
-      'INSERT INTO categorias (nombre, descripcion) VALUES (?, ?)',
-      [nombre, descripcion || null]
+      'INSERT INTO categorias (nombre) VALUES (?)',
+      [nombre]
     );
 
     res.status(201).json({
@@ -46,11 +46,11 @@ router.post('/', verificarToken, verificarRol('ADMIN'), async (req, res) => {
 // PUT /api/categorias/:id - Editar categoría (solo ADMIN)
 router.put('/:id', verificarToken, verificarRol('ADMIN'), async (req, res) => {
   try {
-    const { nombre, descripcion } = req.body;
+    const { nombre } = req.body;
 
     const [resultado] = await pool.query(
-      'UPDATE categorias SET nombre = ?, descripcion = ? WHERE id_categoria = ?',
-      [nombre, descripcion || null, req.params.id]
+      'UPDATE categorias SET nombre = ? WHERE id_categoria = ?',
+      [nombre, req.params.id]
     );
 
     if (resultado.affectedRows === 0) {
@@ -64,11 +64,11 @@ router.put('/:id', verificarToken, verificarRol('ADMIN'), async (req, res) => {
   }
 });
 
-// DELETE /api/categorias/:id - Desactivar categoría (solo ADMIN)
+// DELETE /api/categorias/:id - Eliminar categoría (solo ADMIN)
 router.delete('/:id', verificarToken, verificarRol('ADMIN'), async (req, res) => {
   try {
     const [resultado] = await pool.query(
-      'UPDATE categorias SET activo = FALSE WHERE id_categoria = ?',
+      'DELETE FROM categorias WHERE id_categoria = ?',
       [req.params.id]
     );
 
@@ -76,9 +76,9 @@ router.delete('/:id', verificarToken, verificarRol('ADMIN'), async (req, res) =>
       return res.status(404).json({ error: 'Categoría no encontrada' });
     }
 
-    res.json({ mensaje: 'Categoría desactivada exitosamente' });
+    res.json({ mensaje: 'Categoría eliminada exitosamente' });
   } catch (error) {
-    console.error('Error al desactivar categoría:', error);
+    console.error('Error al eliminar categoría:', error);
     res.status(500).json({ error: 'Error en el servidor' });
   }
 });

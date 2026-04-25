@@ -9,6 +9,7 @@ const pedidoRoutes = require('./Routes/PedidoRoutes');
 const categoriaRoutes = require('./Routes/CategoriaRoutes');
 const usuarioRoutes = require('./Routes/UsuarioRoutes');
 const pagoRoutes = require('./Routes/PagoRoutes');
+const estadisticasRoutes = require('./Routes/EstadisticasRoutes');
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use('/api/pedidos', pedidoRoutes);
 app.use('/api/categorias', categoriaRoutes);
 app.use('/api/usuarios', usuarioRoutes);
 app.use('/api/pagos', pagoRoutes);
+app.use('/api/estadisticas', estadisticasRoutes);
 
 app.get('/', (req, res) => {
   res.send('Backend MarketPutumayo funcionando ✅');
