@@ -5,15 +5,31 @@ const PedidosProductor = () => {
   const [pedidos, setPedidos] = useState([]);
   const [cargando, setCargando] = useState(true);
 
-  useEffect(() => { cargarPedidos(); }, []);
+  useEffect(() => {
+    cargarPedidos();
+  }, []);
 
   const cargarPedidos = async () => {
-    try { const { data } = await API.get('/pedidos/mis-ventas'); setPedidos(data); }
-    catch (error) { console.error('Error al cargar ventas:', error); }
-    finally { setCargando(false); }
+    try {
+      const { data } = await API.get('/pedidos/mis-ventas');
+      setPedidos(data);
+    } catch (error) {
+      console.error('Error al cargar ventas:', error);
+    } finally {
+      setCargando(false);
+    }
   };
 
-  const colorEstado = (estado) => ({ PENDIENTE: '#f4a226', PAGADO: '#1a472a', ENVIADO: '#3182ce', ENTREGADO: '#38a169', CANCELADO: '#e53e3e' }[estado] || '#666');
+  const colorEstado = (estado) => {
+    const colores = {
+      PENDIENTE: '#f4a226',
+      PAGADO: '#1a472a',
+      ENVIADO: '#3182ce',
+      ENTREGADO: '#38a169',
+      CANCELADO: '#e53e3e'
+    };
+    return colores[estado] || '#666';
+  };
 
   if (cargando) return <div style={styles.loading}>Cargando ventas...</div>;
 
@@ -21,28 +37,47 @@ const PedidosProductor = () => {
     <div style={styles.container}>
       <h2 style={styles.title}>📦 Pedidos Recibidos</h2>
       <p style={styles.sub}>Pedidos que incluyen tus productos</p>
+
       {pedidos.length === 0 ? (
-        <div style={styles.vacio}><span style={styles.vacioIcon}>📭</span><p>No tienes ventas aún</p></div>
+        <div style={styles.vacio}>
+          <span style={styles.vacioIcon}>📭</span>
+          <p>No tienes ventas aún</p>
+        </div>
       ) : (
         pedidos.map(p => (
           <div key={p.id_pedido} style={styles.card}>
             <div style={styles.cardHeader}>
               <div>
                 <h4 style={styles.cardTitulo}>Pedido #{p.id_pedido}</h4>
-                <p style={styles.cardMeta}>Comprador: <strong>{p.comprador}</strong></p>
-                <p style={styles.cardMeta}>{new Date(p.fecha).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                <p style={styles.cardMeta}>
+                  Comprador: <strong>{p.comprador}</strong>
+                </p>
+                <p style={styles.cardMeta}>
+                  {new Date(p.fecha).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })}
+                </p>
               </div>
-              <span style={{ ...styles.badge, background: colorEstado(p.estado) + '22', color: colorEstado(p.estado) }}>{p.estado}</span>
+              <span style={{ ...styles.badge, background: colorEstado(p.estado) + '22', color: colorEstado(p.estado) }}>
+                {p.estado}
+              </span>
             </div>
+
             <div style={styles.itemsBox}>
               {p.items.map((item, i) => (
                 <div key={i} style={styles.item}>
-                  <div style={styles.itemInfo}><span style={styles.itemNombre}>🌿 {item.producto}</span><span style={styles.itemCantidad}>{item.cantidad} unidades</span></div>
-                  <span style={styles.itemPrecio}>${Number(item.precio_unitario * item.cantidad).toLocaleString()}</span>
+                  <div style={styles.itemInfo}>
+                    <span style={styles.itemNombre}>🌿 {item.producto}</span>
+                    <span style={styles.itemCantidad}>{item.cantidad} unidades</span>
+                  </div>
+                  <span style={styles.itemPrecio}>
+                    ${Number(item.precio_unitario * item.cantidad).toLocaleString()}
+                  </span>
                 </div>
               ))}
             </div>
-            {p.direccion_entrega && <p style={styles.direccion}>📍 {p.direccion_entrega}</p>}
+
+            {p.direccion_entrega && (
+              <p style={styles.direccion}>📍 {p.direccion_entrega}</p>
+            )}
           </div>
         ))
       )}
@@ -70,4 +105,5 @@ const styles = {
   direccion: { marginTop: '0.75rem', color: '#888', fontSize: '0.85rem' },
   loading: { textAlign: 'center', padding: '3rem', color: '#666' },
 };
+
 export default PedidosProductor;

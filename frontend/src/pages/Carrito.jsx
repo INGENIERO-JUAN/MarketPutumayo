@@ -21,6 +21,7 @@ const Carrito = () => {
   const actualizar = (id, cantidad) => {
     const producto = carrito.find(p => p.id_producto === id);
     if (!producto) return;
+    // No permitir superar el stock disponible
     const cantidadValida = Math.min(Math.max(1, cantidad), producto.stock);
     const nuevo = carrito.map(p => p.id_producto === id ? { ...p, cantidad: cantidadValida } : p);
     setCarrito(nuevo);
