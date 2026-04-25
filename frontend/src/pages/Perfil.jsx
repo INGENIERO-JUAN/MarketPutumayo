@@ -44,6 +44,7 @@ const Perfil = () => {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
+        {/* Avatar y rol */}
         <div style={styles.avatarBox}>
           <div style={styles.avatar}>{usuario?.nombre?.charAt(0).toUpperCase()}</div>
           <div>
@@ -51,12 +52,16 @@ const Perfil = () => {
             <span style={styles.rolBadge}>{rolLabel[usuario?.rol] || usuario?.rol}</span>
           </div>
         </div>
+
         <div style={styles.infoBox}>
           <p style={styles.infoItem}><span style={styles.infoLabel}>Correo:</span> {usuario?.correo}</p>
         </div>
+
         <hr style={styles.divider} />
         <h3 style={styles.sectionTitle}>Editar información</h3>
+
         {mensaje && <div style={mensaje.startsWith('✅') ? styles.exito : styles.error}>{mensaje}</div>}
+
         <form onSubmit={handleSubmit}>
           <div style={styles.field}>
             <label style={styles.label}>Nombre completo</label>
@@ -76,7 +81,9 @@ const Perfil = () => {
             {guardando ? 'Guardando...' : 'Guardar cambios'}
           </button>
         </form>
+
         <hr style={styles.divider} />
+
         <Link to="/perfil/cambiar-password" style={styles.btnPassword}>
           🔒 Cambiar contraseña
         </Link>

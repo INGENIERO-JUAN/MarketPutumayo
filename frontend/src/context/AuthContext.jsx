@@ -4,7 +4,7 @@ const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [usuario, setUsuario] = useState(null);
-  const [cargando, setCargando] = useState(true);
+  const [cargando, setCargando] = useState(true); // evita redirigir antes de cargar
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -17,7 +17,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('usuario');
       }
     }
-    setCargando(false);
+    setCargando(false); // ya terminó de verificar
   }, []);
 
   const login = (token, user) => {

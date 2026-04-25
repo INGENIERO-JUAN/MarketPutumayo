@@ -12,34 +12,67 @@ const CambiarPassword = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (form.passwordNueva.length < 6) { setMensaje('❌ La nueva contraseña debe tener al menos 6 caracteres'); return; }
-    if (form.passwordNueva !== form.confirmar) { setMensaje('❌ Las contraseñas nuevas no coinciden'); return; }
-    setGuardando(true); setMensaje('');
+    if (form.passwordNueva.length < 6) {
+      setMensaje('❌ La nueva contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+    if (form.passwordNueva !== form.confirmar) {
+      setMensaje('❌ Las contraseñas nuevas no coinciden');
+      return;
+    }
+    setGuardando(true);
+    setMensaje('');
     try {
-      await API.put('/usuarios/cambiar-password', { passwordActual: form.passwordActual, passwordNueva: form.passwordNueva });
+      await API.put('/usuarios/cambiar-password', {
+        passwordActual: form.passwordActual,
+        passwordNueva: form.passwordNueva
+      });
       setMensaje('✅ Contraseña actualizada exitosamente');
       setForm({ passwordActual: '', passwordNueva: '', confirmar: '' });
     } catch (error) {
       setMensaje(`❌ ${error.response?.data?.error || 'Error al cambiar contraseña'}`);
-    } finally { setGuardando(false); }
+    } finally {
+      setGuardando(false);
+    }
   };
 
   return (
     <div style={styles.container}>
       <div style={styles.card}>
         <h2 style={styles.title}>🔒 Cambiar Contraseña</h2>
-        {mensaje && <div style={mensaje.startsWith('✅') ? styles.exito : styles.error}>{mensaje}</div>}
+
+        {mensaje && (
+          <div style={mensaje.startsWith('✅') ? styles.exito : styles.error}>{mensaje}</div>
+        )}
+
         <form onSubmit={handleSubmit}>
-          {[{name:'passwordActual',label:'Contraseña actual',key:'actual'},{name:'passwordNueva',label:'Nueva contraseña',key:'nueva'},{name:'confirmar',label:'Confirmar nueva contraseña',key:'confirmar'}].map(({name,label,key}) => (
+          {[
+            { name: 'passwordActual', label: 'Contraseña actual', key: 'actual' },
+            { name: 'passwordNueva', label: 'Nueva contraseña', key: 'nueva' },
+            { name: 'confirmar', label: 'Confirmar nueva contraseña', key: 'confirmar' },
+          ].map(({ name, label, key }) => (
             <div key={name} style={styles.field}>
               <label style={styles.label}>{label}</label>
               <div style={styles.passwordBox}>
-                <input style={styles.input} type={ver[key] ? 'text' : 'password'} name={name} value={form[name]} onChange={handleChange} required placeholder="••••••••" />
-                <button type="button" style={styles.ojito} onClick={() => toggleVer(key)}>{ver[key] ? '🙈' : '👁️'}</button>
+                <input
+                  style={styles.input}
+                  type={ver[key] ? 'text' : 'password'}
+                  name={name}
+                  value={form[name]}
+                  onChange={handleChange}
+                  required
+                  placeholder="••••••••"
+                />
+                <button type="button" style={styles.ojito} onClick={() => toggleVer(key)}>
+                  {ver[key] ? '🙈' : '👁️'}
+                </button>
               </div>
             </div>
           ))}
-          <button style={styles.btn} type="submit" disabled={guardando}>{guardando ? 'Guardando...' : 'Cambiar contraseña'}</button>
+
+          <button style={styles.btn} type="submit" disabled={guardando}>
+            {guardando ? 'Guardando...' : 'Cambiar contraseña'}
+          </button>
         </form>
       </div>
     </div>
@@ -59,4 +92,5 @@ const styles = {
   exito: { background: '#f0fdf4', color: 'var(--verde-oscuro)', padding: '0.75rem 1rem', borderRadius: 'var(--radio-sm)', marginBottom: '1rem', fontSize: '0.9rem', border: '1px solid #bbf7d0' },
   error: { background: '#fef2f2', color: '#dc2626', padding: '0.75rem 1rem', borderRadius: 'var(--radio-sm)', marginBottom: '1rem', fontSize: '0.9rem', border: '1px solid #fecaca' },
 };
+
 export default CambiarPassword;

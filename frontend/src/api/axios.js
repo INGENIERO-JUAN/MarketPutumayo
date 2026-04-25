@@ -4,6 +4,7 @@ const API = axios.create({
   baseURL: 'http://localhost:4000/api',
 });
 
+// Agregar token automáticamente a cada request
 API.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -12,6 +13,7 @@ API.interceptors.request.use((config) => {
   return config;
 });
 
+// Si el token expira, cerrar sesión automáticamente
 API.interceptors.response.use(
   (response) => response,
   (error) => {
