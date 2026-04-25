@@ -1,30 +1,41 @@
-const pool = require('../Config/db');
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../../..', '.env') });
+const mysql = require('mysql2/promise');
 
 const categorias = [
-  { nombre: 'Café y Derivados', descripcion: 'Café especial, tostado, molido y en grano del Putumayo' },
-  { nombre: 'Miel y Apicultura', descripcion: 'Miel pura, propóleo y productos de colmena' },
-  { nombre: 'Panela y Azúcar', descripcion: 'Panela orgánica, miel de caña y derivados' },
-  { nombre: 'Frutas Exóticas', descripcion: 'Frutas tropicales y exóticas de la región amazónica' },
-  { nombre: 'Plantas Medicinales', descripcion: 'Hierbas, plantas medicinales y aromáticas' },
-  { nombre: 'Artesanías', descripcion: 'Artesanías tradicionales y productos culturales del Putumayo' },
-  { nombre: 'Lácteos', descripcion: 'Quesos, cuajadas y productos lácteos artesanales' },
-  { nombre: 'Cacao y Chocolate', descripcion: 'Cacao fino de aroma y chocolates artesanales' },
+  'Café y Derivados',
+  'Miel y Apicultura',
+  'Panela y Azúcar',
+  'Frutas Exóticas',
+  'Plantas Medicinales',
+  'Artesanías',
+  'Lácteos',
+  'Cacao y Chocolate',
 ];
 
 const sembrarCategorias = async () => {
+  let connection;
   try {
+    connection = await mysql.createConnection({
+      host: process.env.DB_HOST,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+    });
+
     console.log('🌱 Sembrando categorías...');
-    for (const cat of categorias) {
-      await pool.query(
-        'INSERT IGNORE INTO categorias (nombre, descripcion) VALUES (?, ?)',
-        [cat.nombre, cat.descripcion]
+    for (const nombre of categorias) {
+      await connection.query(
+        'INSERT IGNORE INTO categorias (nombre) VALUES (?)',
+        [nombre]
       );
     }
     console.log('✅ Categorías sembradas exitosamente');
-    process.exit(0);
   } catch (error) {
     console.error('❌ Error sembrando categorías:', error.message);
-    process.exit(1);
+  } finally {
+    if (connection) await connection.end();
+    process.exit(0);
   }
 };
 
