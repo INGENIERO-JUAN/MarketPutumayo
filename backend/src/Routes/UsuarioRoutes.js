@@ -8,7 +8,7 @@ const { verificarToken, verificarRol } = require('../Middleware/authMiddleware')
 router.get('/perfil', verificarToken, async (req, res) => {
   try {
     const [usuarios] = await pool.query(
-      'SELECT id_usuario, nombre, correo, rol, telefono, municipio, creado_en FROM usuarios WHERE id_usuario = ?',
+      'SELECT id_usuario, nombre, correo, rol, telefono, municipio, latitud, longitud, creado_en FROM usuarios WHERE id_usuario = ?',
       [req.usuario.id_usuario]
     );
 
@@ -126,6 +126,51 @@ router.put('/:id/estado', verificarToken, verificarRol('ADMIN'), async (req, res
     res.json({ mensaje: `Usuario ${activo ? 'activado' : 'desactivado'} exitosamente` });
   } catch (error) {
     console.error('Error al actualizar estado del usuario:', error);
+    res.status(500).json({ error: 'Error en el servidor' });
+  }
+});
+
+// GET /api/usuarios/productores - Listar productores con ubicación (público)
+router.get('/productores', async (req, res) => {
+  try {
+    const [productores] = await pool.query(
+      `SELECT id_usuario, nombre, telefono, municipio, latitud, longitud 
+       FROM usuarios 
+       WHERE rol = 'PRODUCTOR' AND activo = TRUE AND latitud IS NOT NULL AND longitud IS NOT NULL
+       ORDER BY nombre ASC`
+    );
+    res.json(productores);
+  } catch (error) {
+    console.error('Error al listar productores:', error);
+    res.status(500).json({ error: 'Error en el servidor' });
+  }
+});
+
+// PUT /api/usuarios/ubicacion - Actualizar ubicación del productor autenticado
+router.put('/ubicacion', verificarToken, verificarRol('PRODUCTOR'), async (req, res) => {
+  try {
+    const { latitud, longitud } = req.body;
+
+    if (latitud === undefined || longitud === undefined) {
+      return res.status(400).json({ error: 'Latitud y longitud son requeridos' });
+    }
+
+    // Validar rangos válidos para coordenadas
+    if (latitud < -90 || latitud > 90) {
+      return res.status(400).json({ error: 'Latitud debe estar entre -90 y 90' });
+    }
+    if (longitud < -180 || longitud > 180) {
+      return res.status(400).json({ error: 'Longitud debe estar entre -180 y 180' });
+    }
+
+    await pool.query(
+      'UPDATE usuarios SET latitud = ?, longitud = ? WHERE id_usuario = ?',
+      [latitud, longitud, req.usuario.id_usuario]
+    );
+
+    res.json({ mensaje: 'Ubicación actualizada exitosamente' });
+  } catch (error) {
+    console.error('Error al actualizar ubicación:', error);
     res.status(500).json({ error: 'Error en el servidor' });
   }
 });

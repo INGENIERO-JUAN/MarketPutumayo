@@ -27,6 +27,15 @@
   box-sizing: border-box;
 }
 
+:root {
+  --verde-oscuro: #1f5a3f;
+  --verde-claro: #7bc47f;
+  --verde-suave: #e8f4ec;
+  --dorado: #c89b3c;
+  --dorado-oscuro: #9f7324;
+  --radio-sm: 10px;
+}
+
 body {
   font-family: 'DM Sans', sans-serif;
   background-color: var(--crema);
@@ -37,6 +46,14 @@ body {
 
 h1, h2, h3 {
   font-family: 'Playfair Display', serif;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
 }
 
 a {
