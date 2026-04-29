@@ -33,15 +33,26 @@ const MapaProductores = () => {
         if (isProductor) {
           const perfilRes = await axios.get('/usuarios/perfil');
           if (perfilRes.data.latitud && perfilRes.data.longitud) {
-            setMiUbicacion({
-              latitud: parseFloat(perfilRes.data.latitud),
-              longitud: parseFloat(perfilRes.data.longitud),
-            });
+            const lat = parseFloat(perfilRes.data.latitud);
+            const lng = parseFloat(perfilRes.data.longitud);
+            if (!isNaN(lat) && !isNaN(lng)) {
+              setMiUbicacion({
+                lat,
+                lng,
+              });
+            }
           }
         }
 
         // Obtener todos los productores con ubicación
         const response = await axios.get('/usuarios/productores');
+        console.log('Productores obtenidos:', response.data);
+        const validData = response.data.filter(p => {
+          const lat = parseFloat(p.latitud);
+          const lng = parseFloat(p.longitud);
+          return !isNaN(lat) && !isNaN(lng) && isFinite(lat) && isFinite(lng);
+        });
+        console.log('Productores válidos:', validData.length, 'de', response.data.length);
         setProductores(response.data);
       } catch (err) {
         console.error('Error fetching data:', err);
@@ -59,14 +70,37 @@ const MapaProductores = () => {
     infowindowRef.current = new window.google.maps.InfoWindow();
 
     if (productores.length > 0) {
-      const bounds = new window.google.maps.LatLngBounds();
-      productores.forEach((p) => {
-        bounds.extend({ lat: parseFloat(p.latitud), lng: parseFloat(p.longitud) });
+      const validProductores = productores.filter(p => {
+        const lat = parseFloat(p.latitud);
+        const lng = parseFloat(p.longitud);
+        return !isNaN(lat) && !isNaN(lng) && isFinite(lat) && isFinite(lng);
       });
-      if (miUbicacion) {
-        bounds.extend(miUbicacion);
+      if (validProductores.length > 0) {
+        const bounds = new window.google.maps.LatLngBounds();
+        validProductores.forEach((p) => {
+          bounds.extend({ lat: parseFloat(p.latitud), lng: parseFloat(p.longitud) });
+        });
+        if (miUbicacion) {
+          bounds.extend(miUbicacion);
+        }
+        console.log('Bounds calculados:', bounds);
+        mapInstance.fitBounds(bounds);
+        // Asegurar un zoom mínimo
+        const listener = window.google.maps.event.addListener(mapInstance, 'idle', () => {
+          if (mapInstance.getZoom() > 12) {
+            mapInstance.setZoom(12);
+          }
+          window.google.maps.event.removeListener(listener);
+        });
+      } else {
+        console.log('No hay productores con coordenadas válidas, centrando en Putumayo');
+        mapInstance.setCenter(defaultCenter);
+        mapInstance.setZoom(8);
       }
-      mapInstance.fitBounds(bounds);
+    } else {
+      console.log('No hay productores con ubicación, centrando en Putumayo');
+      mapInstance.setCenter(defaultCenter);
+      mapInstance.setZoom(8);
     }
   };
 
@@ -80,11 +114,9 @@ const MapaProductores = () => {
       if (places && places.length > 0) {
         const place = places[0];
         if (place.geometry && place.geometry.location) {
-          const newLocation = {
-            latitud: place.geometry.location.lat(),
-            longitud: place.geometry.location.lng(),
-          };
-          setMiUbicacion(newLocation);
+          const lat = place.geometry.location.lat();
+          const lng = place.geometry.location.lng();
+          setMiUbicacion({ lat, lng });
           
           // Centrar el mapa en la nueva ubicación
           if (map) {
@@ -120,7 +152,10 @@ const MapaProductores = () => {
     if (!miUbicacion) return;
 
     try {
-      await axios.put('/usuarios/ubicacion', miUbicacion);
+      await axios.put('/usuarios/ubicacion', {
+        latitud: miUbicacion.lat,
+        longitud: miUbicacion.lng
+      });
       alert('Ubicación guardada exitosamente');
       setEditMode(false);
     } catch (err) {
@@ -161,7 +196,7 @@ const MapaProductores = () => {
 
   return (
     <div className="container" style={{ padding: '20px' }}>
-      <h2 style={{ marginBottom: '20px' }}>📍 Mapa de Productores</h2>
+      <h2 style={{ marginBottom: '20px' }}>📍 Mapa de Productores ({productores.length} ubicaciones)</h2>
       
       {isProductor && (
         <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
@@ -200,7 +235,7 @@ const MapaProductores = () => {
               </StandaloneSearchBox>
               {miUbicacion && (
                 <p style={{ marginBottom: '10px', color: '#666' }}>
-                  Ubicación actual: {miUbicacion.latitud.toFixed(6)}, {miUbicacion.longitud.toFixed(6)}
+                  Ubicación actual: {miUbicacion.lat.toFixed(6)}, {miUbicacion.lng.toFixed(6)}
                 </p>
               )}
               <div style={{ display: 'flex', gap: '10px' }}>
@@ -236,9 +271,9 @@ const MapaProductores = () => {
         </div>
       )}
 
-      {productores.length === 0 && !isProductor && !loading && (
+      {productores.length === 0 && !loading && (
         <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#fff3cd', borderRadius: '8px' }}>
-          <p style={{ margin: 0, color: '#856404' }}>⚠️ No hay productores con ubicación registrada</p>
+          <p style={{ margin: 0, color: '#856404' }}>⚠️ No hay productores con ubicación registrada aún. ¡Regístrate como productor y agrega tu ubicación!</p>
         </div>
       )}
 
@@ -249,11 +284,9 @@ const MapaProductores = () => {
         onLoad={onMapLoad}
         onClick={(e) => {
           if (editMode && isProductor) {
-              const newLocation = {
-                latitud: e.latLng.lat(),
-                longitud: e.latLng.lng(),
-              };
-              setMiUbicacion(newLocation);
+              const lat = e.latLng.lat();
+              const lng = e.latLng.lng();
+              setMiUbicacion({ lat, lng });
             }
           }}
           options={{
@@ -267,17 +300,28 @@ const MapaProductores = () => {
           }}
         >
           {/* Marcadores de productores */}
-          {productores.map((productor) => (
-            <Marker
-              key={productor.id_usuario}
-              position={{
-                lat: parseFloat(productor.latitud),
-                lng: parseFloat(productor.longitud),
-              }}
-              title={productor.nombre}
-              onClick={(marker) => handleMarkerClick(productor, marker)}
-            />
-          ))}
+          {productores
+            .filter(productor => {
+              const lat = parseFloat(productor.latitud);
+              const lng = parseFloat(productor.longitud);
+              return !isNaN(lat) && !isNaN(lng) && isFinite(lat) && isFinite(lng);
+            })
+            .map((productor) => {
+              const lat = parseFloat(productor.latitud);
+              const lng = parseFloat(productor.longitud);
+              console.log(`Mostrando marcador para ${productor.nombre}: lat=${lat}, lng=${lng}`);
+              return (
+                <Marker
+                  key={productor.id_usuario}
+                  position={{
+                    lat,
+                    lng,
+                  }}
+                  title={productor.nombre}
+                  onClick={(marker) => handleMarkerClick(productor, marker)}
+                />
+              );
+            })}
 
           {/* Mi ubicación (si es productor) */}
           {miUbicacion && isProductor && (
