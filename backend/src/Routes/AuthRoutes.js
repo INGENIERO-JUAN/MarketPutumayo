@@ -7,7 +7,7 @@ const pool = require('../Config/db');
 // REGISTRO
 router.post('/registro', async (req, res) => {
   try {
-    const { nombre, correo, password, rol, telefono, municipio } = req.body;
+    const { nombre, correo, password, rol, telefono, municipio, latitud, longitud } = req.body;
 
     // Validar datos requeridos
     if (!nombre || !correo || !password || !rol) {
@@ -46,8 +46,8 @@ router.post('/registro', async (req, res) => {
 
     // Insertar usuario
     const [resultado] = await pool.query(
-      'INSERT INTO usuarios (nombre, correo, password_hash, rol, telefono, municipio) VALUES (?, ?, ?, ?, ?, ?)',
-      [nombre, correo, hashedPassword, rol, telefono || null, municipio || null]
+      'INSERT INTO usuarios (nombre, correo, password_hash, rol, telefono, municipio, latitud, longitud) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [nombre, correo, hashedPassword, rol, telefono || null, municipio || null, latitud || null, longitud || null]
     );
 
     res.status(201).json({

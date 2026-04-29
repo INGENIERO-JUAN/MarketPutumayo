@@ -26,15 +26,15 @@ router.get('/perfil', verificarToken, async (req, res) => {
 // PUT /api/usuarios/perfil - Actualizar perfil propio
 router.put('/perfil', verificarToken, async (req, res) => {
   try {
-    const { nombre, telefono, municipio } = req.body;
+    const { nombre, telefono, municipio, latitud, longitud } = req.body;
 
     if (!nombre) {
       return res.status(400).json({ error: 'El nombre es requerido' });
     }
 
     await pool.query(
-      'UPDATE usuarios SET nombre = ?, telefono = ?, municipio = ? WHERE id_usuario = ?',
-      [nombre, telefono || null, municipio || null, req.usuario.id_usuario]
+      'UPDATE usuarios SET nombre = ?, telefono = ?, municipio = ?, latitud = ?, longitud = ? WHERE id_usuario = ?',
+      [nombre, telefono || null, municipio || null, latitud || null, longitud || null, req.usuario.id_usuario]
     );
 
     res.json({ mensaje: 'Perfil actualizado exitosamente' });
