@@ -20,16 +20,16 @@ const Navbar = () => {
         {usuario?.rol === 'COMPRADOR' && (<>
           <Link to="/carrito" style={styles.link}>🛒 Carrito</Link>
           <Link to="/mis-pedidos" style={styles.link}>📋 Mis Pedidos</Link>
+          <Link to="/conversaciones" style={styles.link}>💬 Mensajes</Link>
         </>)}
 
         {usuario?.rol === 'PRODUCTOR' && (<>
           <Link to="/productor" style={styles.link}>📦 Mis Productos</Link>
-          <Link to="/productor/pedidos" style={styles.link}>📬 Ventas</Link>
+          <Link to="/conversaciones" style={styles.link}>💬 Mensajes</Link>
         </>)}
 
         {usuario?.rol === 'ADMIN' && (<>
           <Link to="/admin" style={styles.link}>⚙️ Admin</Link>
-          <Link to="/admin/dashboard" style={styles.linkDash}>📊 Dashboard</Link>
         </>)}
 
         {usuario ? (
@@ -59,7 +59,6 @@ const styles = {
   logoAccent: { color: 'var(--dorado)' },
   links: { display: 'flex', alignItems: 'center', gap: '1.5rem' },
   link: { color: 'rgba(255,255,255,0.85)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: '500' },
-  linkDash: { color: 'var(--dorado)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: '700' },
   userBox: { display: 'flex', alignItems: 'center', gap: '0.75rem', marginLeft: '0.5rem' },
   userChip: { display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(255,255,255,0.1)', color: 'white', padding: '0.35rem 0.85rem', borderRadius: '20px', fontSize: '0.85rem', fontWeight: '500', textDecoration: 'none' },
   userDot: { width: '7px', height: '7px', borderRadius: '50%', background: 'var(--verde-claro)', display: 'inline-block' },
