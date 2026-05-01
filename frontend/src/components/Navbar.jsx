@@ -32,6 +32,10 @@ const Navbar = () => {
           <Link to="/admin" style={styles.link}>⚙️ Admin</Link>
         </>)}
 
+        <Link to="/mapa-productores" style={styles.link}>🗺️ Mapa</Link>
+        {usuario?.rol === 'COMPRADOR' && (<><Link to="/carrito" style={styles.link}>🛒 Carrito</Link><Link to="/mis-pedidos" style={styles.link}>📋 Mis Pedidos</Link></>)}
+        {usuario?.rol === 'PRODUCTOR' && (<><Link to="/productor" style={styles.link}>📦 Mis Productos</Link><Link to="/productor/pedidos" style={styles.link}>📬 Ventas</Link></>)}
+        {usuario?.rol === 'ADMIN' && <Link to="/admin" style={styles.link}>⚙️ Admin</Link>}
         {usuario ? (
           <div style={styles.userBox}>
             <Link to="/perfil" style={styles.userChip}>

@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS usuarios (
   rol           ENUM('ADMIN','PRODUCTOR','COMPRADOR') NOT NULL,
   telefono      VARCHAR(20),
   municipio     VARCHAR(100),
+  latitud       DECIMAL(10,8),
+  longitud      DECIMAL(11,8),
   activo        BOOLEAN       NOT NULL DEFAULT TRUE,
   creado_en     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   actualizado_en TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
