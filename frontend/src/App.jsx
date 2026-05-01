@@ -11,6 +11,7 @@ import Productor from './pages/Productor';
 import MisPedidos from './pages/MisPedidos';
 import Perfil from './pages/Perfil';
 import NotFound from './pages/NotFound';
+import Conversaciones from './pages/Conversaciones';
 import DetalleProducto from './pages/DetalleProducto';
 import PedidosProductor from './pages/PedidosProductor';
 import CambiarPassword from './pages/CambiarPassword';
@@ -30,35 +31,28 @@ function App() {
 
           {/* Solo COMPRADOR */}
           <Route path="/carrito" element={
-            <PrivateRoute rol="COMPRADOR">
-              <Carrito />
-            </PrivateRoute>
+            <PrivateRoute rol="COMPRADOR"><Carrito /></PrivateRoute>
           } />
           <Route path="/mis-pedidos" element={
-            <PrivateRoute rol="COMPRADOR">
-              <MisPedidos />
-            </PrivateRoute>
+            <PrivateRoute rol="COMPRADOR"><MisPedidos /></PrivateRoute>
           } />
 
           {/* Solo PRODUCTOR */}
           <Route path="/productor" element={
-            <PrivateRoute rol="PRODUCTOR">
-              <Productor />
-            </PrivateRoute>
+            <PrivateRoute rol="PRODUCTOR"><Productor /></PrivateRoute>
           } />
 
           {/* Solo ADMIN */}
           <Route path="/admin" element={
-            <PrivateRoute rol="ADMIN">
-              <Admin />
-            </PrivateRoute>
+            <PrivateRoute rol="ADMIN"><Admin /></PrivateRoute>
           } />
 
           {/* Cualquier usuario autenticado */}
           <Route path="/perfil" element={
-            <PrivateRoute>
-              <Perfil />
-            </PrivateRoute>
+            <PrivateRoute><Perfil /></PrivateRoute>
+          } />
+          <Route path="/conversaciones" element={
+            <PrivateRoute><Conversaciones /></PrivateRoute>
           } />
 
           {/* 404 */}
