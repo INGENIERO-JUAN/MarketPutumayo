@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../Config/db');
 const { verificarToken, verificarRol } = require('../Middleware/authMiddleware');
+const { evaluarProducto } = require('../Utils/moderadorIA');
 
 // GET /api/productos - Listar productos aprobados (público)
 router.get('/', async (req, res) => {
@@ -96,6 +97,14 @@ router.post('/', verificarToken, verificarRol('PRODUCTOR'), async (req, res) => 
       return res.status(400).json({ error: 'Precio y stock deben ser positivos' });
     }
 
+    const moderacion = await evaluarProducto({ nombre, descripcion, imagen_url });
+    if (moderacion.flagged) {
+      return res.status(400).json({
+        error: 'El producto contiene contenido indebido y no puede ser publicado',
+        moderacion: moderacion.reasons
+      });
+    }
+
     const [resultado] = await pool.query(
       `INSERT INTO productos (id_productor, id_categoria, nombre, descripcion, precio, stock, imagen_url)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -136,6 +145,14 @@ router.put('/:id', verificarToken, verificarRol('PRODUCTOR'), async (req, res) =
 
     if (precio < 0 || stock < 0) {
       return res.status(400).json({ error: 'Precio y stock deben ser positivos' });
+    }
+
+    const moderacion = await evaluarProducto({ nombre, descripcion, imagen_url });
+    if (moderacion.flagged) {
+      return res.status(400).json({
+        error: 'El producto contiene contenido indebido y no puede ser actualizado',
+        moderacion: moderacion.reasons
+      });
     }
 
     await pool.query(
@@ -198,6 +215,39 @@ router.delete('/:id', verificarToken, verificarRol('PRODUCTOR', 'ADMIN'), async 
     res.json({ mensaje: 'Producto eliminado exitosamente' });
   } catch (error) {
     console.error('Error al eliminar producto:', error);
+    res.status(500).json({ error: 'Error en el servidor' });
+  }
+});
+
+// POST /api/productos/moderar/batch - Analiza y elimina productos indebidos (solo ADMIN)
+router.post('/moderar/batch', verificarToken, verificarRol('ADMIN'), async (req, res) => {
+  try {
+    const [productos] = await pool.query(
+      `SELECT id_producto, nombre, descripcion, imagen_url
+       FROM productos
+       WHERE estado IN ('APROBADO', 'PENDIENTE')`
+    );
+
+    const eliminados = [];
+
+    for (const producto of productos) {
+      const moderacion = await evaluarProducto(producto);
+      if (moderacion.flagged) {
+        await pool.query('DELETE FROM productos WHERE id_producto = ?', [producto.id_producto]);
+        eliminados.push({
+          id_producto: producto.id_producto,
+          nombre: producto.nombre,
+          razones: moderacion.reasons
+        });
+      }
+    }
+
+    res.json({
+      mensaje: `${eliminados.length} producto(s) indebido(s) eliminado(s)`,
+      eliminados
+    });
+  } catch (error) {
+    console.error('Error al moderar productos:', error);
     res.status(500).json({ error: 'Error en el servidor' });
   }
 });
