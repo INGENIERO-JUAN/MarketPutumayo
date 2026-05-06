@@ -2,13 +2,14 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../Config/db');
 const { verificarToken, verificarRol } = require('../Middleware/authMiddleware');
+const { moderarProducto } = require('../Config/moderacion');
 
 // GET /api/productos - Listar productos aprobados (público)
 router.get('/', async (req, res) => {
   try {
     const [productos] = await pool.query(
       `SELECT p.id_producto, p.nombre, p.descripcion, p.precio, p.stock,
-              p.estado, p.imagen_url, c.nombre AS categoria, u.nombre AS productor
+              p.imagen_url, p.estado, c.nombre AS categoria, u.nombre AS productor
        FROM productos p
        JOIN categorias c ON p.id_categoria = c.id_categoria
        JOIN usuarios u ON p.id_productor = u.id_usuario
@@ -27,7 +28,7 @@ router.get('/mis-productos', verificarToken, verificarRol('PRODUCTOR'), async (r
   try {
     const [productos] = await pool.query(
       `SELECT p.id_producto, p.nombre, p.descripcion, p.precio, p.stock,
-              p.estado, p.imagen_url, c.nombre AS categoria
+              p.estado, c.nombre AS categoria
        FROM productos p
        JOIN categorias c ON p.id_categoria = c.id_categoria
        WHERE p.id_productor = ?
@@ -41,12 +42,30 @@ router.get('/mis-productos', verificarToken, verificarRol('PRODUCTOR'), async (r
   }
 });
 
+// GET /api/productos/todos - Listar todos los productos (solo ADMIN)
+router.get('/todos', verificarToken, verificarRol('ADMIN'), async (req, res) => {
+  try {
+    const [productos] = await pool.query(
+      `SELECT p.id_producto, p.nombre, p.descripcion, p.precio, p.stock,
+              p.imagen_url, p.estado, c.nombre AS categoria, u.nombre AS productor
+       FROM productos p
+       JOIN categorias c ON p.id_categoria = c.id_categoria
+       JOIN usuarios u ON p.id_productor = u.id_usuario
+       ORDER BY p.creado_en DESC`
+    );
+    res.json(productos);
+  } catch (error) {
+    console.error('Error al listar todos los productos:', error);
+    res.status(500).json({ error: 'Error en el servidor' });
+  }
+});
+
 // GET /api/productos/pendientes - Ver productos pendientes (solo ADMIN)
 router.get('/pendientes', verificarToken, verificarRol('ADMIN'), async (req, res) => {
   try {
     const [productos] = await pool.query(
       `SELECT p.id_producto, p.nombre, p.descripcion, p.precio, p.stock,
-              p.estado, p.imagen_url, c.nombre AS categoria, u.nombre AS productor
+              p.estado, c.nombre AS categoria, u.nombre AS productor
        FROM productos p
        JOIN categorias c ON p.id_categoria = c.id_categoria
        JOIN usuarios u ON p.id_productor = u.id_usuario
@@ -60,22 +79,24 @@ router.get('/pendientes', verificarToken, verificarRol('ADMIN'), async (req, res
   }
 });
 
-// GET /api/productos/:id - Ver detalle (solo productos APROBADOS públicamente)
+// GET /api/productos/:id - Ver detalle de un producto (público)
 router.get('/:id', async (req, res) => {
   try {
     const [productos] = await pool.query(
       `SELECT p.id_producto, p.nombre, p.descripcion, p.precio, p.stock,
-              p.estado, p.imagen_url, p.creado_en,
-              c.nombre AS categoria, u.nombre AS productor, u.telefono AS telefono_productor
+              p.imagen_url, p.estado, c.nombre AS categoria,
+              p.id_productor, u.nombre AS productor, u.telefono AS telefono_productor
        FROM productos p
        JOIN categorias c ON p.id_categoria = c.id_categoria
        JOIN usuarios u ON p.id_productor = u.id_usuario
        WHERE p.id_producto = ? AND p.estado = 'APROBADO'`,
       [req.params.id]
     );
+
     if (productos.length === 0) {
       return res.status(404).json({ error: 'Producto no encontrado' });
     }
+
     res.json(productos[0]);
   } catch (error) {
     console.error('Error al obtener producto:', error);
@@ -88,7 +109,7 @@ router.post('/', verificarToken, verificarRol('PRODUCTOR'), async (req, res) => 
   try {
     const { nombre, descripcion, precio, stock, id_categoria, imagen_url } = req.body;
 
-    if (!nombre || !precio || stock === undefined || !id_categoria) {
+    if (!nombre || !precio || !stock || !id_categoria) {
       return res.status(400).json({ error: 'Faltan datos requeridos' });
     }
 
@@ -96,58 +117,36 @@ router.post('/', verificarToken, verificarRol('PRODUCTOR'), async (req, res) => 
       return res.status(400).json({ error: 'Precio y stock deben ser positivos' });
     }
 
+    // Obtener nombre de categoría para la IA
+    const [cats] = await pool.query('SELECT nombre FROM categorias WHERE id_categoria = ?', [id_categoria]);
+    const categoria = cats[0]?.nombre || '';
+
+    // Moderación automática con IA
+    console.log(`🤖 Moderando producto: "${nombre}"...`);
+    const { decision, razon } = await moderarProducto({ nombre, descripcion, precio, categoria });
+    console.log(`🤖 Decisión: ${decision} — ${razon}`);
+
+    if (decision === 'RECHAZADO') {
+      return res.status(422).json({
+        error: `Producto rechazado por moderación automática: ${razon}`,
+        moderacion: { decision, razon }
+      });
+    }
+
+    // Insertar directamente como APROBADO si pasa la moderación
     const [resultado] = await pool.query(
-      `INSERT INTO productos (id_productor, id_categoria, nombre, descripcion, precio, stock, imagen_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO productos (id_productor, id_categoria, nombre, descripcion, precio, stock, imagen_url, estado)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'APROBADO')`,
       [req.usuario.id_usuario, id_categoria, nombre, descripcion || null, precio, stock, imagen_url || null]
     );
 
     res.status(201).json({
-      mensaje: 'Producto creado exitosamente, pendiente de aprobación',
-      id_producto: resultado.insertId
+      mensaje: '✅ Producto aprobado y publicado automáticamente',
+      id_producto: resultado.insertId,
+      moderacion: { decision, razon }
     });
   } catch (error) {
     console.error('Error al crear producto:', error);
-    res.status(500).json({ error: 'Error en el servidor' });
-  }
-});
-
-// PUT /api/productos/:id - Editar producto (PRODUCTOR dueño)
-router.put('/:id', verificarToken, verificarRol('PRODUCTOR'), async (req, res) => {
-  try {
-    const { nombre, descripcion, precio, stock, id_categoria, imagen_url } = req.body;
-
-    const [productos] = await pool.query(
-      'SELECT id_productor FROM productos WHERE id_producto = ?',
-      [req.params.id]
-    );
-
-    if (productos.length === 0) {
-      return res.status(404).json({ error: 'Producto no encontrado' });
-    }
-
-    if (productos[0].id_productor !== req.usuario.id_usuario) {
-      return res.status(403).json({ error: 'No tienes permiso para editar este producto' });
-    }
-
-    if (!nombre || !precio || stock === undefined || !id_categoria) {
-      return res.status(400).json({ error: 'Faltan datos requeridos' });
-    }
-
-    if (precio < 0 || stock < 0) {
-      return res.status(400).json({ error: 'Precio y stock deben ser positivos' });
-    }
-
-    await pool.query(
-      `UPDATE productos
-       SET nombre = ?, descripcion = ?, precio = ?, stock = ?, id_categoria = ?, imagen_url = ?, estado = 'PENDIENTE'
-       WHERE id_producto = ?`,
-      [nombre, descripcion || null, precio, stock, id_categoria, imagen_url || null, req.params.id]
-    );
-
-    res.json({ mensaje: 'Producto actualizado exitosamente. Pendiente de aprobación.' });
-  } catch (error) {
-    console.error('Error al editar producto:', error);
     res.status(500).json({ error: 'Error en el servidor' });
   }
 });
@@ -156,7 +155,7 @@ router.put('/:id', verificarToken, verificarRol('PRODUCTOR'), async (req, res) =
 router.put('/:id/estado', verificarToken, verificarRol('ADMIN'), async (req, res) => {
   try {
     const { estado } = req.body;
-    const estadosValidos = ['APROBADO', 'RECHAZADO', 'PENDIENTE'];
+    const estadosValidos = ['APROBADO', 'RECHAZADO'];
 
     if (!estadosValidos.includes(estado)) {
       return res.status(400).json({ error: 'Estado inválido' });
