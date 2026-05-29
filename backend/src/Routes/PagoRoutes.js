@@ -43,6 +43,26 @@ router.post('/', verificarToken, verificarRol('COMPRADOR'), async (req, res) => 
       [id_pedido]
     );
 
+    const [productores] = await pool.query(
+      `SELECT DISTINCT pr.id_productor, pe.total
+       FROM pedidos pe
+       JOIN detalle_pedido dp ON pe.id_pedido = dp.id_pedido
+       JOIN productos pr ON dp.id_producto = pr.id_producto
+       WHERE pe.id_pedido = ?`,
+      [id_pedido]
+    );
+
+    for (const productor of productores) {
+      await pool.query(
+        `INSERT INTO notificaciones (id_usuario, tipo, mensaje)
+         VALUES (?, 'PAGO', ?)`,
+        [
+          productor.id_productor,
+          `Se registro un pago del pedido #${id_pedido} por $${Number(productor.total).toLocaleString('es-CO')}.`
+        ]
+      );
+    }
+
     res.status(201).json({
       mensaje: 'Pago registrado exitosamente',
       id_pago: resultado.insertId
