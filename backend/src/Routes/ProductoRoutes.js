@@ -2,9 +2,9 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../Config/db');
 const { verificarToken, verificarRol } = require('../Middleware/authMiddleware');
-const { moderarProducto } = require('../Config/moderacion');
+const { evaluarProducto } = require('../Utils/moderadorIA');
 
-// GET /api/productos - Listar productos aprobados (público)
+// GET /api/productos - Listar productos aprobados (publico)
 router.get('/', async (req, res) => {
   try {
     const [productos] = await pool.query(
@@ -28,7 +28,7 @@ router.get('/mis-productos', verificarToken, verificarRol('PRODUCTOR'), async (r
   try {
     const [productos] = await pool.query(
       `SELECT p.id_producto, p.nombre, p.descripcion, p.precio, p.stock,
-              p.estado, c.nombre AS categoria
+              p.imagen_url, p.estado, c.nombre AS categoria
        FROM productos p
        JOIN categorias c ON p.id_categoria = c.id_categoria
        WHERE p.id_productor = ?
@@ -65,7 +65,7 @@ router.get('/pendientes', verificarToken, verificarRol('ADMIN'), async (req, res
   try {
     const [productos] = await pool.query(
       `SELECT p.id_producto, p.nombre, p.descripcion, p.precio, p.stock,
-              p.estado, c.nombre AS categoria, u.nombre AS productor
+              p.imagen_url, p.estado, c.nombre AS categoria, u.nombre AS productor
        FROM productos p
        JOIN categorias c ON p.id_categoria = c.id_categoria
        JOIN usuarios u ON p.id_productor = u.id_usuario
@@ -79,7 +79,7 @@ router.get('/pendientes', verificarToken, verificarRol('ADMIN'), async (req, res
   }
 });
 
-// GET /api/productos/:id - Ver detalle de un producto (público)
+// GET /api/productos/:id - Ver detalle de un producto (publico)
 router.get('/:id', async (req, res) => {
   try {
     const [productos] = await pool.query(
@@ -109,7 +109,7 @@ router.post('/', verificarToken, verificarRol('PRODUCTOR'), async (req, res) => 
   try {
     const { nombre, descripcion, precio, stock, id_categoria, imagen_url } = req.body;
 
-    if (!nombre || !precio || !stock || !id_categoria) {
+    if (!nombre || !precio || stock === undefined || !id_categoria) {
       return res.status(400).json({ error: 'Faltan datos requeridos' });
     }
 
@@ -117,23 +117,14 @@ router.post('/', verificarToken, verificarRol('PRODUCTOR'), async (req, res) => 
       return res.status(400).json({ error: 'Precio y stock deben ser positivos' });
     }
 
-    // Obtener nombre de categoría para la IA
-    const [cats] = await pool.query('SELECT nombre FROM categorias WHERE id_categoria = ?', [id_categoria]);
-    const categoria = cats[0]?.nombre || '';
-
-    // Moderación automática con IA
-    console.log(`🤖 Moderando producto: "${nombre}"...`);
-    const { decision, razon } = await moderarProducto({ nombre, descripcion, precio, categoria });
-    console.log(`🤖 Decisión: ${decision} — ${razon}`);
-
-    if (decision === 'RECHAZADO') {
-      return res.status(422).json({
-        error: `Producto rechazado por moderación automática: ${razon}`,
-        moderacion: { decision, razon }
+    const moderacion = await evaluarProducto({ nombre, descripcion, imagen_url });
+    if (moderacion.flagged) {
+      return res.status(400).json({
+        error: 'El producto contiene contenido indebido y no puede ser publicado',
+        moderacion: moderacion.reasons,
       });
     }
 
-    // Insertar directamente como APROBADO si pasa la moderación
     const [resultado] = await pool.query(
       `INSERT INTO productos (id_productor, id_categoria, nombre, descripcion, precio, stock, imagen_url, estado)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'APROBADO')`,
@@ -141,12 +132,60 @@ router.post('/', verificarToken, verificarRol('PRODUCTOR'), async (req, res) => 
     );
 
     res.status(201).json({
-      mensaje: '✅ Producto aprobado y publicado automáticamente',
+      mensaje: 'Producto aprobado y publicado automaticamente',
       id_producto: resultado.insertId,
-      moderacion: { decision, razon }
+      moderacion: { flagged: false, reasons: [] },
     });
   } catch (error) {
     console.error('Error al crear producto:', error);
+    res.status(500).json({ error: 'Error en el servidor' });
+  }
+});
+
+// PUT /api/productos/:id - Editar producto (PRODUCTOR dueno)
+router.put('/:id', verificarToken, verificarRol('PRODUCTOR'), async (req, res) => {
+  try {
+    const { nombre, descripcion, precio, stock, id_categoria, imagen_url } = req.body;
+
+    const [productos] = await pool.query(
+      'SELECT id_productor FROM productos WHERE id_producto = ?',
+      [req.params.id]
+    );
+
+    if (productos.length === 0) {
+      return res.status(404).json({ error: 'Producto no encontrado' });
+    }
+
+    if (productos[0].id_productor !== req.usuario.id_usuario) {
+      return res.status(403).json({ error: 'No tienes permiso para editar este producto' });
+    }
+
+    if (!nombre || !precio || stock === undefined || !id_categoria) {
+      return res.status(400).json({ error: 'Faltan datos requeridos' });
+    }
+
+    if (precio < 0 || stock < 0) {
+      return res.status(400).json({ error: 'Precio y stock deben ser positivos' });
+    }
+
+    const moderacion = await evaluarProducto({ nombre, descripcion, imagen_url });
+    if (moderacion.flagged) {
+      return res.status(400).json({
+        error: 'El producto contiene contenido indebido y no puede ser actualizado',
+        moderacion: moderacion.reasons,
+      });
+    }
+
+    await pool.query(
+      `UPDATE productos
+       SET nombre = ?, descripcion = ?, precio = ?, stock = ?, id_categoria = ?, imagen_url = ?, estado = 'PENDIENTE'
+       WHERE id_producto = ?`,
+      [nombre, descripcion || null, precio, stock, id_categoria, imagen_url || null, req.params.id]
+    );
+
+    res.json({ mensaje: 'Producto actualizado exitosamente. Pendiente de aprobacion.' });
+  } catch (error) {
+    console.error('Error al editar producto:', error);
     res.status(500).json({ error: 'Error en el servidor' });
   }
 });
@@ -158,7 +197,7 @@ router.put('/:id/estado', verificarToken, verificarRol('ADMIN'), async (req, res
     const estadosValidos = ['APROBADO', 'RECHAZADO'];
 
     if (!estadosValidos.includes(estado)) {
-      return res.status(400).json({ error: 'Estado inválido' });
+      return res.status(400).json({ error: 'Estado invalido' });
     }
 
     const [resultado] = await pool.query(
@@ -177,7 +216,7 @@ router.put('/:id/estado', verificarToken, verificarRol('ADMIN'), async (req, res
   }
 });
 
-// DELETE /api/productos/:id - Eliminar producto (PRODUCTOR dueño o ADMIN)
+// DELETE /api/productos/:id - Eliminar producto (PRODUCTOR dueno o ADMIN)
 router.delete('/:id', verificarToken, verificarRol('PRODUCTOR', 'ADMIN'), async (req, res) => {
   try {
     const [productos] = await pool.query(
@@ -197,6 +236,39 @@ router.delete('/:id', verificarToken, verificarRol('PRODUCTOR', 'ADMIN'), async 
     res.json({ mensaje: 'Producto eliminado exitosamente' });
   } catch (error) {
     console.error('Error al eliminar producto:', error);
+    res.status(500).json({ error: 'Error en el servidor' });
+  }
+});
+
+// POST /api/productos/moderar/batch - Analiza y elimina productos indebidos (solo ADMIN)
+router.post('/moderar/batch', verificarToken, verificarRol('ADMIN'), async (req, res) => {
+  try {
+    const [productos] = await pool.query(
+      `SELECT id_producto, nombre, descripcion, imagen_url
+       FROM productos
+       WHERE estado IN ('APROBADO', 'PENDIENTE')`
+    );
+
+    const eliminados = [];
+
+    for (const producto of productos) {
+      const moderacion = await evaluarProducto(producto);
+      if (moderacion.flagged) {
+        await pool.query('DELETE FROM productos WHERE id_producto = ?', [producto.id_producto]);
+        eliminados.push({
+          id_producto: producto.id_producto,
+          nombre: producto.nombre,
+          razones: moderacion.reasons,
+        });
+      }
+    }
+
+    res.json({
+      mensaje: `${eliminados.length} producto(s) indebido(s) eliminado(s)`,
+      eliminados,
+    });
+  } catch (error) {
+    console.error('Error al moderar productos:', error);
     res.status(500).json({ error: 'Error en el servidor' });
   }
 });
