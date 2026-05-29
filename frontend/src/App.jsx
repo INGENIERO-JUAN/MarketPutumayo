@@ -13,6 +13,10 @@ import MisPedidos from './pages/MisPedidos';
 import Perfil from './pages/Perfil';
 import NotFound from './pages/NotFound';
 import Conversaciones from './pages/Conversaciones';
+import DetalleProducto from './pages/DetalleProducto';
+import PedidosProductor from './pages/PedidosProductor';
+import CambiarPassword from './pages/CambiarPassword';
+import MapaProductores from './pages/MapaProductores';
 
 function App() {
   return (
@@ -54,6 +58,10 @@ function App() {
           } />
 
           {/* 404 */}
+          <Route path="/catalogo/:id" element={<DetalleProducto />} />
+          <Route path="/mapa-productores" element={<MapaProductores />} />
+          <Route path="/productor/pedidos" element={<PrivateRoute rol="PRODUCTOR"><PedidosProductor /></PrivateRoute>} />
+          <Route path="/perfil/cambiar-password" element={<PrivateRoute><CambiarPassword /></PrivateRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

@@ -17,6 +17,7 @@ const Conversaciones = () => {
     if (!usuario) { navigate('/login'); return; }
     cargarConversaciones();
 
+    // Si viene de un producto, abrir chat directamente
     const idConv = searchParams.get('conv');
     if (idConv) {
       setChatActivo(parseInt(idConv));

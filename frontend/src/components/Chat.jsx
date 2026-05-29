@@ -105,6 +105,7 @@ const Chat = ({ id_conversacion, otroUsuario, onCerrar }) => {
   return (
     <div style={styles.overlay}>
       <div style={styles.chatBox}>
+        {/* Header */}
         <div style={styles.header}>
           <div style={styles.headerInfo}>
             <div style={styles.avatar}>{otroUsuario?.nombre?.[0]?.toUpperCase() || '?'}</div>
@@ -119,10 +120,12 @@ const Chat = ({ id_conversacion, otroUsuario, onCerrar }) => {
           <button style={styles.btnCerrar} onClick={onCerrar}>✕</button>
         </div>
 
+        {/* Info pago físico */}
         <div style={styles.infoBanner}>
           💡 Puedes coordinar aquí un <strong>pago en efectivo</strong> o un <strong>encuentro físico</strong> con el productor.
         </div>
 
+        {/* Mensajes */}
         <div style={styles.mensajesBox}>
           {mensajes.length === 0 && (
             <div style={styles.sinMensajes}>
@@ -165,6 +168,7 @@ const Chat = ({ id_conversacion, otroUsuario, onCerrar }) => {
           <div ref={bottomRef} />
         </div>
 
+        {/* Input */}
         <div style={styles.inputBox}>
           <textarea
             style={styles.textarea}

@@ -2,25 +2,64 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import API from '../api/axios';
+import ModalMapa from '../components/ModalMapa';
 
 const Perfil = () => {
   const { usuario, login } = useAuth();
-  const [form, setForm] = useState({ nombre: '', telefono: '', municipio: '' });
+  const [form, setForm] = useState({ nombre: '', telefono: '', municipio: '', latitud: null, longitud: null });
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState('');
+  const [mostrarMapa, setMostrarMapa] = useState(false);
+  const [initialLocation, setInitialLocation] = useState(null);
 
   useEffect(() => { cargarPerfil(); }, []);
 
   const cargarPerfil = async () => {
     try {
       const { data } = await API.get('/usuarios/perfil');
-      setForm({ nombre: data.nombre || '', telefono: data.telefono || '', municipio: data.municipio || '' });
+      setForm({ 
+        nombre: data.nombre || '', 
+        telefono: data.telefono || '', 
+        municipio: data.municipio || '',
+        latitud: data.latitud || null,
+        longitud: data.longitud || null
+      });
     } catch (error) { console.error('Error al cargar perfil:', error); }
     finally { setCargando(false); }
   };
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const handleLocationSelect = (location) => {
+    setForm({ 
+      ...form, 
+      latitud: location.lat, 
+      longitud: location.lng,
+      municipio: location.municipio || form.municipio 
+    });
+  };
+
+  const obtenerUbicacionActual = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const currentPos = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+          setInitialLocation(currentPos);
+          setMostrarMapa(true);
+        },
+        (error) => {
+          console.error('Error obteniendo ubicación:', error);
+          setMensaje('❌ No se pudo obtener tu ubicación. Verifica permisos de geolocalización.');
+        }
+      );
+    } else {
+      setMensaje('❌ Geolocalización no soportada en este navegador.');
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -74,9 +113,25 @@ const Perfil = () => {
             </div>
             <div style={styles.field}>
               <label style={styles.label}>Municipio</label>
-              <input style={styles.input} type="text" name="municipio" placeholder="Mocoa, Sibundoy..." value={form.municipio} onChange={handleChange} />
+              <div style={styles.municipioContainer}>
+                <input style={styles.inputMunicipio} type="text" name="municipio" placeholder="Mocoa, Sibundoy..." value={form.municipio} onChange={handleChange} />
+                <button type="button" style={styles.btnUbicacionPeque} onClick={obtenerUbicacionActual} title="Obtener ubicación actual">
+                  📍
+                </button>
+              </div>
             </div>
           </div>
+          
+          <div style={styles.field}>
+            <label style={styles.label}>Ubicación en el mapa</label>
+            <button type="button" style={styles.btnUbicacion} onClick={() => setMostrarMapa(true)}>
+              📍 {form.latitud && form.longitud ? 'Actualizar ubicación' : 'Seleccionar ubicación'}
+            </button>
+            {form.latitud && form.longitud && (
+              <p style={styles.coordsText}>Lat: {parseFloat(form.latitud).toFixed(4)}, Lng: {parseFloat(form.longitud).toFixed(4)}</p>
+            )}
+          </div>
+
           <button style={styles.btn} type="submit" disabled={guardando}>
             {guardando ? 'Guardando...' : 'Guardar cambios'}
           </button>
@@ -88,6 +143,14 @@ const Perfil = () => {
           🔒 Cambiar contraseña
         </Link>
       </div>
+
+      <ModalMapa
+        isOpen={mostrarMapa}
+        onClose={() => { setMostrarMapa(false); setInitialLocation(null); }}
+        onSelectLocation={handleLocationSelect}
+        initialLocation={initialLocation || (form.latitud && form.longitud ? { lat: parseFloat(form.latitud), lng: parseFloat(form.longitud) } : null)}
+        titulo="Actualiza tu ubicación"
+      />
     </div>
   );
 };
@@ -113,6 +176,34 @@ const styles = {
   exito: { background: '#f0fdf4', color: 'var(--verde-oscuro)', padding: '0.75rem 1rem', borderRadius: 'var(--radio-sm)', marginBottom: '1rem', fontSize: '0.9rem', border: '1px solid #bbf7d0' },
   error: { background: '#fef2f2', color: '#dc2626', padding: '0.75rem 1rem', borderRadius: 'var(--radio-sm)', marginBottom: '1rem', fontSize: '0.9rem', border: '1px solid #fecaca' },
   loading: { textAlign: 'center', padding: '3rem', color: 'var(--gris-texto)' },
+  btnUbicacion: { width: '100%', padding: '0.75rem 1rem', background: '#f0fdf4', color: 'var(--verde-oscuro)', border: '2px dashed #86efac', borderRadius: 'var(--radio-sm)', fontSize: '0.9rem', fontWeight: '600', cursor: 'pointer' },
+  coordsText: { marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--verde-oscuro)', fontWeight: '500' },
+  municipioContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+  },
+  inputMunicipio: {
+    flex: 1,
+    padding: '0.75rem 1rem',
+    border: '1.5px solid #e2e8f0',
+    borderRadius: 'var(--radio-sm)',
+    fontSize: '0.9rem',
+    background: 'white',
+    outline: 'none',
+    transition: 'border-color 0.2s',
+    boxSizing: 'border-box',
+  },
+  btnUbicacionPeque: {
+    padding: '0.75rem',
+    background: '#f0fdf4',
+    color: 'var(--verde-oscuro)',
+    border: '1px solid #86efac',
+    borderRadius: 'var(--radio-sm)',
+    cursor: 'pointer',
+    fontSize: '1rem',
+    transition: 'all 0.2s',
+  },
 };
 
 export default Perfil;
