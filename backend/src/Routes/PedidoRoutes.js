@@ -9,7 +9,7 @@ router.post('/', verificarToken, verificarRol('COMPRADOR'), async (req, res) => 
   try {
     const { items, direccion_entrega, notas } = req.body;
 
-    if (!items || items.length === 0) {
+    if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'El carrito está vacío' });
     }
 
@@ -17,6 +17,13 @@ router.post('/', verificarToken, verificarRol('COMPRADOR'), async (req, res) => 
 
     let total = 0;
     for (const item of items) {
+      if (!item.id_producto || !Number.isInteger(Number(item.cantidad)) || Number(item.cantidad) <= 0) {
+        await connection.rollback();
+        return res.status(400).json({ error: 'Cada item debe tener producto y cantidad valida' });
+      }
+
+      const cantidad = Number(item.cantidad);
+
       const [productos] = await connection.query(
         'SELECT precio, stock FROM productos WHERE id_producto = ? AND estado = "APROBADO"',
         [item.id_producto]
@@ -27,12 +34,12 @@ router.post('/', verificarToken, verificarRol('COMPRADOR'), async (req, res) => 
         return res.status(404).json({ error: `Producto ${item.id_producto} no encontrado` });
       }
 
-      if (productos[0].stock < item.cantidad) {
+      if (productos[0].stock < cantidad) {
         await connection.rollback();
         return res.status(400).json({ error: `Stock insuficiente para el producto ${item.id_producto}` });
       }
 
-      total += productos[0].precio * item.cantidad;
+      total += Number(productos[0].precio) * cantidad;
     }
 
     const [pedido] = await connection.query(
@@ -41,6 +48,8 @@ router.post('/', verificarToken, verificarRol('COMPRADOR'), async (req, res) => 
     );
 
     for (const item of items) {
+      const cantidad = Number(item.cantidad);
+
       const [productos] = await connection.query(
         'SELECT precio FROM productos WHERE id_producto = ?',
         [item.id_producto]
@@ -48,17 +57,16 @@ router.post('/', verificarToken, verificarRol('COMPRADOR'), async (req, res) => 
 
       await connection.query(
         'INSERT INTO detalle_pedido (id_pedido, id_producto, cantidad, precio_unitario) VALUES (?, ?, ?, ?)',
-        [pedido.insertId, item.id_producto, item.cantidad, productos[0].precio]
+        [pedido.insertId, item.id_producto, cantidad, productos[0].precio]
       );
 
       await connection.query(
         'UPDATE productos SET stock = stock - ? WHERE id_producto = ?',
-        [item.cantidad, item.id_producto]
+        [cantidad, item.id_producto]
       );
     }
 
     await connection.commit();
-    connection.release();
 
     res.status(201).json({
       mensaje: 'Pedido creado exitosamente',
@@ -67,9 +75,10 @@ router.post('/', verificarToken, verificarRol('COMPRADOR'), async (req, res) => 
     });
   } catch (error) {
     await connection.rollback();
-    connection.release();
     console.error('Error al crear pedido:', error);
     res.status(500).json({ error: 'Error en el servidor' });
+  } finally {
+    connection.release();
   }
 });
 
