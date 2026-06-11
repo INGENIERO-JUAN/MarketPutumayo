@@ -119,7 +119,11 @@ CREATE TABLE IF NOT EXISTS pagos (
   estado        ENUM('PENDIENTE','APROBADO','RECHAZADO') NOT NULL DEFAULT 'PENDIENTE',
   referencia    VARCHAR(100),
   monto         DECIMAL(10,2) NOT NULL CHECK (monto >= 0),
+  proveedor     VARCHAR(30) NOT NULL DEFAULT 'MANUAL',
+  transaccion_id VARCHAR(120),
+  checkout_url  VARCHAR(500),
   fecha         TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (id_pedido) REFERENCES pedidos(id_pedido) ON DELETE CASCADE,
   INDEX idx_pagos_pedido (id_pedido),
   INDEX idx_pagos_estado (estado)

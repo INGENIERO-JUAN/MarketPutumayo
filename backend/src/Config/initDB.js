@@ -58,6 +58,10 @@ const migrarSchemaExistente = async (connection) => {
   await agregarColumnaSiFalta(connection, 'detalle_pedido', 'subtotal', 'DECIMAL(10,2) GENERATED ALWAYS AS (cantidad * precio_unitario) STORED');
 
   await agregarColumnaSiFalta(connection, 'pagos', 'monto', 'DECIMAL(10,2) NOT NULL DEFAULT 0');
+  await agregarColumnaSiFalta(connection, 'pagos', 'proveedor', "VARCHAR(30) NOT NULL DEFAULT 'MANUAL'");
+  await agregarColumnaSiFalta(connection, 'pagos', 'transaccion_id', 'VARCHAR(120) NULL');
+  await agregarColumnaSiFalta(connection, 'pagos', 'checkout_url', 'VARCHAR(500) NULL');
+  await agregarColumnaSiFalta(connection, 'pagos', 'actualizado_en', 'TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP');
   await connection.query(
     `ALTER TABLE pagos
      MODIFY COLUMN metodo ENUM('EFECTIVO','TRANSFERENCIA','TARJETA','NEQUI','DAVIPLATA')
