@@ -1,62 +1,110 @@
-import { useState, useEffect, useRef } from 'react';
-import { GoogleMap, Marker, useJsApiLoader, StandaloneSearchBox } from '@react-google-maps/api';
-import axios from '../api/axios';
+import { useEffect, useMemo, useState } from 'react';
+import { MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+import API from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 
-const libraries = ['places', 'marker'];
+const defaultCenter = { lat: 0.853, lng: -76.646 };
 
-const defaultCenter = { lat: 0.853, lng: -76.646 }; // Putumayo, Colombia
+const greenIcon = new L.Icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
+
+const blueIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+  iconRetinaUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
+
+const toLocation = (item) => {
+  const lat = Number.parseFloat(item?.latitud);
+  const lng = Number.parseFloat(item?.longitud);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
+};
+
+const MapClickHandler = ({ enabled, onSelect }) => {
+  useMapEvents({
+    click(event) {
+      if (!enabled) return;
+      onSelect({
+        lat: event.latlng.lat,
+        lng: event.latlng.lng,
+      });
+    },
+  });
+
+  return null;
+};
+
+const FitMapBounds = ({ locations }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    const validLocations = locations.filter(Boolean);
+    if (validLocations.length === 0) {
+      map.setView([defaultCenter.lat, defaultCenter.lng], 8);
+      return;
+    }
+
+    const bounds = L.latLngBounds(validLocations.map((location) => [location.lat, location.lng]));
+    map.fitBounds(bounds, { padding: [32, 32], maxZoom: 13 });
+  }, [locations, map]);
+
+  return null;
+};
 
 const MapaProductores = () => {
   const { usuario } = useAuth();
+  const isProductor = usuario?.rol === 'PRODUCTOR';
   const [productores, setProductores] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [map, setMap] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [mensaje, setMensaje] = useState('');
   const [miUbicacion, setMiUbicacion] = useState(null);
   const [editMode, setEditMode] = useState(false);
-  const [searchBox, setSearchBox] = useState(null);
-  const infowindowRef = useRef(null);
-  const markerRefs = useRef({});
 
-  const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
-    libraries,
-  });
+  const productoresValidos = useMemo(
+    () => productores.map((productor) => ({ productor, location: toLocation(productor) })).filter((item) => item.location),
+    [productores]
+  );
 
-  const isProductor = usuario?.rol === 'PRODUCTOR';
+  const mapLocations = useMemo(
+    () => [...productoresValidos.map(({ location }) => location), miUbicacion].filter(Boolean),
+    [miUbicacion, productoresValidos]
+  );
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Si es productor, obtener su ubicación actual
-        if (isProductor) {
-          const perfilRes = await axios.get('/usuarios/perfil');
-          if (perfilRes.data.latitud && perfilRes.data.longitud) {
-            const lat = parseFloat(perfilRes.data.latitud);
-            const lng = parseFloat(perfilRes.data.longitud);
-            if (!isNaN(lat) && !isNaN(lng)) {
-              setMiUbicacion({
-                lat,
-                lng,
-              });
-            }
-          }
-        }
+        setError('');
 
-        // Obtener todos los productores con ubicación
-        const response = await axios.get('/usuarios/productores');
-        console.log('Productores obtenidos:', response.data);
-        const validData = response.data.filter(p => {
-          const lat = parseFloat(p.latitud);
-          const lng = parseFloat(p.longitud);
-          return !isNaN(lat) && !isNaN(lng) && isFinite(lat) && isFinite(lng);
-        });
-        console.log('Productores válidos:', validData.length, 'de', response.data.length);
-        setProductores(response.data);
+        const requests = [API.get('/usuarios/productores')];
+        if (isProductor) requests.push(API.get('/usuarios/perfil'));
+
+        const [productoresRes, perfilRes] = await Promise.all(requests);
+        setProductores(Array.isArray(productoresRes.data) ? productoresRes.data : []);
+
+        if (perfilRes?.data) {
+          const location = toLocation(perfilRes.data);
+          if (location) setMiUbicacion(location);
+        }
       } catch (err) {
-        console.error('Error fetching data:', err);
-        setError('Error al cargar datos');
+        console.error('Error al cargar mapa:', err);
+        setError(err.response?.data?.error || 'Error al cargar ubicaciones');
       } finally {
         setLoading(false);
       }
@@ -65,291 +113,333 @@ const MapaProductores = () => {
     fetchData();
   }, [isProductor]);
 
-  const onMapLoad = (mapInstance) => {
-    setMap(mapInstance);
-    infowindowRef.current = new window.google.maps.InfoWindow();
+  const usarUbicacionActual = () => {
+    if (!navigator.geolocation) {
+      setMensaje('Error: geolocalizacion no soportada en este navegador');
+      return;
+    }
 
-    if (productores.length > 0) {
-      const validProductores = productores.filter(p => {
-        const lat = parseFloat(p.latitud);
-        const lng = parseFloat(p.longitud);
-        return !isNaN(lat) && !isNaN(lng) && isFinite(lat) && isFinite(lng);
-      });
-      if (validProductores.length > 0) {
-        const bounds = new window.google.maps.LatLngBounds();
-        validProductores.forEach((p) => {
-          bounds.extend({ lat: parseFloat(p.latitud), lng: parseFloat(p.longitud) });
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setMiUbicacion({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
         });
-        if (miUbicacion) {
-          bounds.extend(miUbicacion);
-        }
-        console.log('Bounds calculados:', bounds);
-        mapInstance.fitBounds(bounds);
-        // Asegurar un zoom mínimo
-        const listener = window.google.maps.event.addListener(mapInstance, 'idle', () => {
-          if (mapInstance.getZoom() > 12) {
-            mapInstance.setZoom(12);
-          }
-          window.google.maps.event.removeListener(listener);
-        });
-      } else {
-        console.log('No hay productores con coordenadas válidas, centrando en Putumayo');
-        mapInstance.setCenter(defaultCenter);
-        mapInstance.setZoom(8);
+        setMensaje('');
+      },
+      () => {
+        setMensaje('Error: no se pudo obtener tu ubicacion');
       }
-    } else {
-      console.log('No hay productores con ubicación, centrando en Putumayo');
-      mapInstance.setCenter(defaultCenter);
-      mapInstance.setZoom(8);
-    }
-  };
-
-  const onSearchBoxLoad = (ref) => {
-    setSearchBox(ref);
-  };
-
-  const handlePlacesChanged = () => {
-    if (searchBox) {
-      const places = searchBox.getPlaces();
-      if (places && places.length > 0) {
-        const place = places[0];
-        if (place.geometry && place.geometry.location) {
-          const lat = place.geometry.location.lat();
-          const lng = place.geometry.location.lng();
-          setMiUbicacion({ lat, lng });
-          
-          // Centrar el mapa en la nueva ubicación
-          if (map) {
-            map.setCenter(newLocation);
-            map.setZoom(14);
-          }
-        }
-      }
-    }
-  };
-
-  const handleMarkerClick = (productor, marker) => {
-    if (infowindowRef.current && marker) {
-      infowindowRef.current.setContent(`
-        <div style="padding: 8px; max-width: 200px;">
-          <h4 style="margin: 0 0 8px 0; color: #333;">${productor.nombre}</h4>
-          <p style="margin: 4px 0; color: #666; font-size: 14px;">
-            <strong>Municipio:</strong> ${productor.municipio || 'No especificado'}
-          </p>
-          <p style="margin: 4px 0; color: #666; font-size: 14px;">
-            <strong>Teléfono:</strong> ${productor.telefono || 'No disponible'}
-          </p>
-        </div>
-      `);
-      infowindowRef.current.open({
-        anchor: marker,
-        map,
-      });
-    }
+    );
   };
 
   const guardarUbicacion = async () => {
     if (!miUbicacion) return;
 
+    setSaving(true);
+    setMensaje('');
     try {
-      await axios.put('/usuarios/ubicacion', {
+      await API.put('/usuarios/ubicacion', {
         latitud: miUbicacion.lat,
-        longitud: miUbicacion.lng
+        longitud: miUbicacion.lng,
       });
-      alert('Ubicación guardada exitosamente');
+      setMensaje('Ubicacion guardada correctamente');
       setEditMode(false);
     } catch (err) {
-      console.error('Error saving location:', err);
-      alert('Error al guardar ubicación');
+      console.error('Error al guardar ubicacion:', err);
+      setMensaje(`Error: ${err.response?.data?.error || 'Error al guardar ubicacion'}`);
+    } finally {
+      setSaving(false);
     }
   };
 
-  if (loadError) {
-    return (
-      <div className="container" style={{ padding: '20px' }}>
-        <div style={{ height: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
-          <p style={{ color: '#666' }}>Error al cargar el mapa</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isLoaded) {
-    return (
-      <div className="container" style={{ padding: '20px' }}>
-        <div style={{ height: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
-          <p style={{ color: '#666' }}>Cargando mapa...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="container" style={{ padding: '20px' }}>
-        <div style={{ height: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
-          <p style={{ color: '#666' }}>Cargando ubicaciones...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="container" style={{ padding: '20px' }}>
-      <h2 style={{ marginBottom: '20px' }}>📍 Mapa de Productores ({productores.length} ubicaciones)</h2>
-      
+    <main style={styles.page}>
+      <section style={styles.header}>
+        <div>
+          <p style={styles.kicker}>Productores locales</p>
+          <h1 style={styles.title}>Mapa de productores</h1>
+          <p style={styles.subtitle}>Encuentra productores registrados con ubicacion en Putumayo.</p>
+        </div>
+        <div style={styles.counter}>
+          <strong>{productoresValidos.length}</strong>
+          <span>ubicaciones</span>
+        </div>
+      </section>
+
       {isProductor && (
-        <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
+        <section style={styles.panel}>
           {!editMode ? (
-            <button 
-              onClick={() => setEditMode(true)}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: '#28a745',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-              }}
-            >
-              📍 {miUbicacion ? 'Cambiar mi ubicación' : 'Establecer mi ubicación'}
-            </button>
+            <div style={styles.editRow}>
+              <div>
+                <h2 style={styles.panelTitle}>Mi ubicacion</h2>
+                <p style={styles.panelText}>
+                  {miUbicacion
+                    ? `Lat ${miUbicacion.lat.toFixed(5)}, Lng ${miUbicacion.lng.toFixed(5)}`
+                    : 'Aun no tienes una ubicacion registrada.'}
+                </p>
+              </div>
+              <button type="button" onClick={() => setEditMode(true)} style={styles.primaryButton}>
+                {miUbicacion ? 'Cambiar ubicacion' : 'Establecer ubicacion'}
+              </button>
+            </div>
           ) : (
             <div>
-              <p style={{ marginBottom: '10px' }}>🔍 Busca tu ubicación o haz clic en el mapa para colocarla</p>
-              <StandaloneSearchBox
-                onLoad={onSearchBoxLoad}
-                onPlacesChanged={handlePlacesChanged}
-              >
-                <input
-                  type="text"
-                  placeholder="Buscar ubicación..."
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    marginBottom: '10px',
-                    borderRadius: '5px',
-                    border: '1px solid #ddd',
-                  }}
-                />
-              </StandaloneSearchBox>
+              <h2 style={styles.panelTitle}>Selecciona tu punto en el mapa</h2>
+              <p style={styles.panelText}>Haz clic en el mapa, arrastra el marcador o usa la ubicacion del navegador.</p>
               {miUbicacion && (
-                <p style={{ marginBottom: '10px', color: '#666' }}>
-                  Ubicación actual: {miUbicacion.lat.toFixed(6)}, {miUbicacion.lng.toFixed(6)}
-                </p>
+                <p style={styles.coords}>Lat {miUbicacion.lat.toFixed(6)}, Lng {miUbicacion.lng.toFixed(6)}</p>
               )}
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button 
-                  onClick={guardarUbicacion}
-                  style={{
-                    padding: '10px 20px',
-                    backgroundColor: '#007bff',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  💾 Guardar ubicación
+              <div style={styles.actions}>
+                <button type="button" onClick={usarUbicacionActual} style={styles.secondaryButton}>
+                  Usar mi ubicacion
                 </button>
-                <button 
-                  onClick={() => setEditMode(false)}
-                  style={{
-                    padding: '10px 20px',
-                    backgroundColor: '#6c757d',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                  }}
-                >
+                <button type="button" onClick={guardarUbicacion} style={styles.primaryButton} disabled={saving || !miUbicacion}>
+                  {saving ? 'Guardando...' : 'Guardar ubicacion'}
+                </button>
+                <button type="button" onClick={() => setEditMode(false)} style={styles.secondaryButton}>
                   Cancelar
                 </button>
               </div>
             </div>
           )}
-        </div>
+          {mensaje && <div style={mensaje.includes('Error') ? styles.errorBox : styles.successBox}>{mensaje}</div>}
+        </section>
       )}
 
-      {productores.length === 0 && !loading && (
-        <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#fff3cd', borderRadius: '8px' }}>
-          <p style={{ margin: 0, color: '#856404' }}>⚠️ No hay productores con ubicación registrada aún. ¡Regístrate como productor y agrega tu ubicación!</p>
-        </div>
-      )}
-
-      <GoogleMap
-        mapContainerStyle={{ width: '100%', height: '500px', borderRadius: '8px' }}
-        center={miUbicacion || defaultCenter}
-        zoom={miUbicacion ? 12 : 8}
-        onLoad={onMapLoad}
-        onClick={(e) => {
-          if (editMode && isProductor) {
-              const lat = e.latLng.lat();
-              const lng = e.latLng.lng();
-              setMiUbicacion({ lat, lng });
-            }
-          }}
-          options={{
-            styles: [
-              {
-                featureType: 'poi',
-                elementType: 'labels',
-                stylers: [{ visibility: 'off' }],
-              },
-            ],
-          }}
-        >
-          {/* Marcadores de productores */}
-          {productores
-            .filter(productor => {
-              const lat = parseFloat(productor.latitud);
-              const lng = parseFloat(productor.longitud);
-              return !isNaN(lat) && !isNaN(lng) && isFinite(lat) && isFinite(lng);
-            })
-            .map((productor) => {
-              const lat = parseFloat(productor.latitud);
-              const lng = parseFloat(productor.longitud);
-              console.log(`Mostrando marcador para ${productor.nombre}: lat=${lat}, lng=${lng}`);
-              return (
-                <Marker
-                  key={productor.id_usuario}
-                  position={{
-                    lat,
-                    lng,
-                  }}
-                  title={productor.nombre}
-                  onClick={(marker) => handleMarkerClick(productor, marker)}
-                />
-              );
-            })}
-
-          {/* Mi ubicación (si es productor) */}
-          {miUbicacion && isProductor && (
-            <Marker
-              position={miUbicacion}
-              title="Mi ubicación"
-              icon={{
-                url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png',
-              }}
+      <section style={styles.mapPanel}>
+        {loading ? (
+          <div style={styles.mapState}>Cargando ubicaciones...</div>
+        ) : error ? (
+          <div style={styles.mapState}>{error}</div>
+        ) : (
+          <MapContainer
+            center={[miUbicacion?.lat || defaultCenter.lat, miUbicacion?.lng || defaultCenter.lng]}
+            zoom={miUbicacion ? 12 : 8}
+            style={{ width: '100%', height: '520px', borderRadius: '8px' }}
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-          )}
-        </GoogleMap>
-      
+            <FitMapBounds locations={mapLocations} />
+            <MapClickHandler enabled={editMode && isProductor} onSelect={setMiUbicacion} />
 
-      <div style={{ marginTop: '20px' }}>
-        <h3>Productores ({productores.length})</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
-          {productores.map((p) => (
-            <div key={p.id_usuario} style={{ padding: '15px', border: '1px solid #ddd', borderRadius: '8px' }}>
-              <h4 style={{ margin: '0 0 10px 0' }}>{p.nombre}</h4>
-              <p style={{ margin: '5px 0', color: '#666' }}>📍 {p.municipio || 'Municipio no especificado'}</p>
-              <p style={{ margin: '5px 0', color: '#666' }}>📞 {p.telefono || 'Teléfono no disponible'}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
+            {productoresValidos.map(({ productor, location }) => (
+              <Marker key={productor.id_usuario} position={[location.lat, location.lng]} icon={greenIcon}>
+                <Popup>
+                  <div style={styles.infoWindow}>
+                    <strong>{productor.nombre}</strong>
+                    <span>{productor.municipio || 'Municipio no especificado'}</span>
+                    <span>{productor.telefono || 'Telefono no disponible'}</span>
+                  </div>
+                </Popup>
+              </Marker>
+            ))}
+
+            {miUbicacion && isProductor && (
+              <Marker
+                position={[miUbicacion.lat, miUbicacion.lng]}
+                icon={blueIcon}
+                draggable={editMode}
+                eventHandlers={{
+                  dragend(event) {
+                    const latlng = event.target.getLatLng();
+                    setMiUbicacion({ lat: latlng.lat, lng: latlng.lng });
+                  },
+                }}
+              >
+                <Popup>Mi ubicacion</Popup>
+              </Marker>
+            )}
+          </MapContainer>
+        )}
+      </section>
+
+      <section style={styles.grid}>
+        {productoresValidos.length === 0 && !loading ? (
+          <div style={styles.empty}>No hay productores con ubicacion registrada aun.</div>
+        ) : (
+          productoresValidos.map(({ productor }) => (
+            <article key={productor.id_usuario} style={styles.card}>
+              <h3 style={styles.cardTitle}>{productor.nombre}</h3>
+              <p style={styles.cardText}>{productor.municipio || 'Municipio no especificado'}</p>
+              <p style={styles.cardText}>{productor.telefono || 'Telefono no disponible'}</p>
+            </article>
+          ))
+        )}
+      </section>
+    </main>
   );
+};
+
+const styles = {
+  page: {
+    minHeight: 'calc(100vh - 72px)',
+    background: 'var(--crema)',
+    padding: '2rem',
+  },
+  header: {
+    maxWidth: '1180px',
+    margin: '0 auto 1rem',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'end',
+    gap: '1rem',
+  },
+  kicker: {
+    margin: '0 0 0.3rem',
+    color: 'var(--verde-medio)',
+    fontSize: '0.82rem',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+  },
+  title: {
+    margin: 0,
+    color: 'var(--verde-oscuro)',
+    fontFamily: "'Playfair Display', serif",
+    fontSize: '2rem',
+  },
+  subtitle: {
+    margin: '0.4rem 0 0',
+    color: 'var(--gris-texto)',
+  },
+  counter: {
+    minWidth: '126px',
+    background: 'white',
+    border: '1px solid var(--borde-suave)',
+    borderRadius: 'var(--radio-md)',
+    padding: '0.8rem 1rem',
+    textAlign: 'center',
+    boxShadow: 'var(--sombra-sm)',
+  },
+  panel: {
+    maxWidth: '1180px',
+    margin: '0 auto 1rem',
+    background: 'white',
+    border: '1px solid var(--borde-suave)',
+    borderRadius: 'var(--radio-md)',
+    padding: '1rem',
+    boxShadow: 'var(--sombra-sm)',
+  },
+  editRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '1rem',
+  },
+  panelTitle: {
+    margin: '0 0 0.25rem',
+    color: 'var(--verde-oscuro)',
+    fontSize: '1rem',
+  },
+  panelText: {
+    margin: 0,
+    color: 'var(--gris-texto)',
+    fontSize: '0.92rem',
+  },
+  coords: {
+    margin: '0.7rem 0 0',
+    color: 'var(--verde-oscuro)',
+    fontWeight: 600,
+    fontSize: '0.88rem',
+  },
+  actions: {
+    display: 'flex',
+    gap: '0.75rem',
+    flexWrap: 'wrap',
+    marginTop: '0.9rem',
+  },
+  primaryButton: {
+    padding: '0.75rem 1rem',
+    background: 'var(--verde-oscuro)',
+    color: 'white',
+    border: 'none',
+    borderRadius: 'var(--radio-sm)',
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
+  secondaryButton: {
+    padding: '0.75rem 1rem',
+    background: '#f1f5f9',
+    color: '#475569',
+    border: 'none',
+    borderRadius: 'var(--radio-sm)',
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
+  successBox: {
+    marginTop: '0.75rem',
+    padding: '0.75rem',
+    borderRadius: 'var(--radio-sm)',
+    background: '#f0fdf4',
+    color: 'var(--verde-oscuro)',
+    border: '1px solid #bbf7d0',
+  },
+  errorBox: {
+    marginTop: '0.75rem',
+    padding: '0.75rem',
+    borderRadius: 'var(--radio-sm)',
+    background: '#fef2f2',
+    color: '#dc2626',
+    border: '1px solid #fecaca',
+  },
+  mapPanel: {
+    maxWidth: '1180px',
+    margin: '0 auto 1.25rem',
+    background: 'white',
+    border: '1px solid var(--borde-suave)',
+    borderRadius: 'var(--radio-md)',
+    padding: '0.75rem',
+    boxShadow: 'var(--sombra-md)',
+  },
+  mapState: {
+    height: '520px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#f8fafc',
+    borderRadius: '8px',
+    color: '#64748b',
+  },
+  infoWindow: {
+    display: 'grid',
+    gap: '0.25rem',
+    color: '#334155',
+    minWidth: '180px',
+  },
+  grid: {
+    maxWidth: '1180px',
+    margin: '0 auto',
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+    gap: '1rem',
+  },
+  card: {
+    background: 'white',
+    border: '1px solid var(--borde-suave)',
+    borderRadius: 'var(--radio-md)',
+    padding: '1rem',
+    boxShadow: 'var(--sombra-sm)',
+  },
+  cardTitle: {
+    margin: '0 0 0.5rem',
+    color: 'var(--verde-oscuro)',
+    fontSize: '1rem',
+  },
+  cardText: {
+    margin: '0.25rem 0',
+    color: 'var(--gris-texto)',
+    fontSize: '0.9rem',
+  },
+  empty: {
+    gridColumn: '1 / -1',
+    background: 'white',
+    border: '1px solid var(--borde-suave)',
+    borderRadius: 'var(--radio-md)',
+    padding: '1rem',
+    color: 'var(--gris-texto)',
+  },
 };
 
 export default MapaProductores;

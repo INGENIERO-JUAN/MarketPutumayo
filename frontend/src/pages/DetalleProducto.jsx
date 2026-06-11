@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import API from '../api/axios';
 import ConversorMoneda from '../components/ConversorMoneda';
+import Chat from '../components/Chat';
 
 const DetalleProducto = () => {
   const { id } = useParams();
@@ -12,13 +13,11 @@ const DetalleProducto = () => {
   const [resenas, setResenas] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState('');
+  const [chatAbierto, setChatAbierto] = useState(false);
+  const [idConversacion, setIdConversacion] = useState(null);
+  const [iniciandoChat, setIniciandoChat] = useState(false);
 
-  useEffect(() => {
-    cargarProducto();
-    cargarResenas();
-  }, [id]);
-
-  const cargarProducto = async () => {
+  const cargarProducto = useCallback(async () => {
     try {
       const { data } = await API.get(`/productos/${id}`);
       setProducto(data);
@@ -27,16 +26,21 @@ const DetalleProducto = () => {
     } finally {
       setCargando(false);
     }
-  };
+  }, [id]);
 
-  const cargarResenas = async () => {
+  const cargarResenas = useCallback(async () => {
     try {
       const { data } = await API.get(`/resenas/${id}`);
       setResenas(data);
-    } catch (error) {
-      // Si no hay reseñas o la ruta no existe aún, ignorar
+    } catch {
+      // ignorar si no existe el endpoint aún
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    cargarProducto();
+    cargarResenas();
+  }, [cargarProducto, cargarResenas]);
 
   const agregarAlCarrito = () => {
     if (!usuario) { navigate('/login'); return; }
@@ -50,6 +54,23 @@ const DetalleProducto = () => {
     localStorage.setItem('carrito', JSON.stringify(carrito));
     setMensaje('✅ Producto agregado al carrito');
     setTimeout(() => setMensaje(''), 2500);
+  };
+
+  const contactarProductor = async () => {
+    if (!usuario) { navigate('/login'); return; }
+    setIniciandoChat(true);
+    try {
+      const { data } = await API.post('/chat/conversaciones', {
+        id_productor: producto.id_productor,
+        id_producto: producto.id_producto
+      });
+      setIdConversacion(data.id_conversacion);
+      setChatAbierto(true);
+    } catch (error) {
+      console.error('Error al iniciar conversación:', error);
+    } finally {
+      setIniciandoChat(false);
+    }
   };
 
   if (cargando) return <div style={styles.loading}>Cargando producto...</div>;
@@ -92,31 +113,47 @@ const DetalleProducto = () => {
             </span>
           </div>
 
-          {/* ── Conversor de moneda (API externa ExchangeRate-API) ── */}
           <ConversorMoneda precioCOP={producto.precio} />
 
           {mensaje && <div style={styles.toast}>{mensaje}</div>}
 
-          {usuario?.rol === 'COMPRADOR' && (
-            producto.stock > 0 ? (
-              <button style={styles.btnCarrito} onClick={agregarAlCarrito}>
-                🛒 Agregar al carrito
-              </button>
-            ) : (
-              <button style={{ ...styles.btnCarrito, background: '#ccc', cursor: 'not-allowed' }} disabled>
-                Sin stock
-              </button>
-            )
-          )}
+          {/* Botones de acción */}
+          <div style={styles.botones}>
+            {usuario?.rol === 'COMPRADOR' && (
+              <>
+                {producto.stock > 0 ? (
+                  <button style={styles.btnCarrito} onClick={agregarAlCarrito}>
+                    🛒 Agregar al carrito
+                  </button>
+                ) : (
+                  <button style={{ ...styles.btnCarrito, background: '#ccc', cursor: 'not-allowed' }} disabled>
+                    Sin stock
+                  </button>
+                )}
+                <button style={styles.btnChat} onClick={contactarProductor} disabled={iniciandoChat}>
+                  {iniciandoChat ? 'Abriendo chat...' : '💬 Contactar productor'}
+                </button>
+              </>
+            )}
 
-          {!usuario && (
-            <button style={styles.btnCarrito} onClick={() => navigate('/login')}>
-              Inicia sesión para comprar
-            </button>
+            {!usuario && (
+              <button style={styles.btnCarrito} onClick={() => navigate('/login')}>
+                Inicia sesión para comprar
+              </button>
+            )}
+          </div>
+
+          {/* Info de pago físico */}
+          {usuario?.rol === 'COMPRADOR' && (
+            <div style={styles.infoPago}>
+              <p style={styles.infoPagoTexto}>
+                💡 ¿Prefieres pagar en efectivo o verte en persona? Usa el chat para coordinar con el productor.
+              </p>
+            </div>
           )}
 
           {producto.telefono_productor && (
-            <p style={styles.contacto}>📞 Contacto del productor: {producto.telefono_productor}</p>
+            <p style={styles.contacto}>📞 {producto.telefono_productor}</p>
           )}
         </div>
       </div>
@@ -137,6 +174,15 @@ const DetalleProducto = () => {
           ))}
         </div>
       )}
+
+      {/* Chat flotante */}
+      {chatAbierto && idConversacion && (
+        <Chat
+          id_conversacion={idConversacion}
+          otroUsuario={{ nombre: producto.productor }}
+          onCerrar={() => setChatAbierto(false)}
+        />
+      )}
     </div>
   );
 };
@@ -156,7 +202,11 @@ const styles = {
   precioBox: { display: 'flex', alignItems: 'center', gap: '1rem' },
   precio: { fontFamily: "'Playfair Display', serif", fontSize: '2rem', fontWeight: '700', color: 'var(--dorado-oscuro)' },
   stock: { color: 'var(--gris-texto)', fontSize: '0.85rem' },
-  btnCarrito: { background: 'var(--verde-oscuro)', color: 'white', border: 'none', padding: '0.9rem 2rem', borderRadius: 'var(--radio-sm)', fontSize: '1rem', fontWeight: '600', cursor: 'pointer', boxShadow: '0 4px 15px rgba(26,71,42,0.25)', marginTop: '0.5rem' },
+  botones: { display: 'flex', flexDirection: 'column', gap: '0.75rem' },
+  btnCarrito: { background: 'var(--verde-oscuro)', color: 'white', border: 'none', padding: '0.9rem 2rem', borderRadius: 'var(--radio-sm)', fontSize: '1rem', fontWeight: '600', cursor: 'pointer', boxShadow: '0 4px 15px rgba(26,71,42,0.25)' },
+  btnChat: { background: 'white', color: 'var(--verde-oscuro)', border: '2px solid var(--verde-oscuro)', padding: '0.85rem 2rem', borderRadius: 'var(--radio-sm)', fontSize: '1rem', fontWeight: '600', cursor: 'pointer' },
+  infoPago: { background: 'var(--verde-suave)', padding: '0.75rem 1rem', borderRadius: 'var(--radio-sm)' },
+  infoPagoTexto: { color: 'var(--verde-oscuro)', fontSize: '0.85rem', margin: 0 },
   toast: { background: 'var(--verde-suave)', color: 'var(--verde-oscuro)', padding: '0.75rem 1rem', borderRadius: 'var(--radio-sm)', fontSize: '0.9rem', fontWeight: '500' },
   contacto: { color: 'var(--gris-texto)', fontSize: '0.85rem', margin: 0 },
   resenasBox: { marginTop: '2rem', background: 'white', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' },

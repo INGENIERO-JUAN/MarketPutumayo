@@ -16,33 +16,32 @@ const Registro = () => {
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleLocationSelect = (location) => {
-    setForm({ 
-      ...form, 
-      latitud: location.lat, 
+    setForm({
+      ...form,
+      latitud: location.lat,
       longitud: location.lng,
-      municipio: location.municipio || form.municipio 
+      municipio: location.municipio || form.municipio,
     });
   };
 
   const obtenerUbicacionActual = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const currentPos = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          };
-          setInitialLocation(currentPos);
-          setMostrarMapa(true);
-        },
-        (error) => {
-          console.error('Error obteniendo ubicación:', error);
-          setError('No se pudo obtener tu ubicación. Verifica permisos de geolocalización.');
-        }
-      );
-    } else {
-      setError('Geolocalización no soportada en este navegador.');
+    if (!navigator.geolocation) {
+      setError('Geolocalizacion no soportada en este navegador.');
+      return;
     }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setInitialLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+        setMostrarMapa(true);
+      },
+      () => {
+        setError('No se pudo obtener tu ubicacion. Revisa los permisos del navegador.');
+      }
+    );
   };
 
   const handleSubmit = async (e) => {
@@ -87,9 +86,9 @@ const Registro = () => {
             </div>
             <div style={styles.field}>
               <label style={styles.label}>Municipio</label>
-              <div style={styles.municipioContainer}>
-                <input style={styles.inputMunicipio} type="text" name="municipio" placeholder="Mocoa, Sibundoy..." value={form.municipio} onChange={handleChange} />
-                <button type="button" style={styles.btnUbicacionPeque} onClick={obtenerUbicacionActual} title="Obtener ubicación actual">
+              <div style={styles.locationLine}>
+                <input style={styles.inputLocation} type="text" name="municipio" placeholder="Mocoa, Sibundoy..." value={form.municipio} onChange={handleChange} />
+                <button type="button" style={styles.iconButton} onClick={obtenerUbicacionActual} title="Usar ubicacion actual">
                   📍
                 </button>
               </div>
@@ -134,12 +133,14 @@ const Registro = () => {
           </div>
 
           <div style={styles.field}>
-            <label style={styles.label}>Ubicación en el mapa</label>
+            <label style={styles.label}>Ubicacion en el mapa</label>
             <button type="button" style={styles.btnUbicacion} onClick={() => setMostrarMapa(true)}>
-              📍 {form.latitud && form.longitud ? 'Ubicación seleccionada' : 'Seleccionar ubicación'}
+              {form.latitud && form.longitud ? 'Ubicacion seleccionada' : 'Seleccionar ubicacion'}
             </button>
             {form.latitud && form.longitud && (
-              <p style={styles.coordsText}>Lat: {form.latitud.toFixed(4)}, Lng: {form.longitud.toFixed(4)}</p>
+              <p style={styles.coordsText}>
+                Lat: {Number(form.latitud).toFixed(4)}, Lng: {Number(form.longitud).toFixed(4)}
+              </p>
             )}
           </div>
 
@@ -164,10 +165,13 @@ const Registro = () => {
 
       <ModalMapa
         isOpen={mostrarMapa}
-        onClose={() => { setMostrarMapa(false); setInitialLocation(null); }}
+        onClose={() => {
+          setMostrarMapa(false);
+          setInitialLocation(null);
+        }}
         onSelectLocation={handleLocationSelect}
-        initialLocation={initialLocation}
-        titulo="Selecciona tu ubicación"
+        initialLocation={initialLocation || (form.latitud && form.longitud ? { lat: Number(form.latitud), lng: Number(form.longitud) } : null)}
+        titulo="Selecciona tu ubicacion"
       />
     </div>
   );
@@ -179,14 +183,15 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'linear-gradient(135deg, var(--verde-suave) 0%, var(--crema) 100%)',
+    background: 'linear-gradient(135deg, rgba(216,243,220,0.92) 0%, var(--crema) 62%, #fffdf9 100%)',
     padding: '2rem',
   },
   card: {
-    background: 'white',
+    background: 'rgba(255,255,255,0.9)',
     padding: '2.5rem',
     borderRadius: 'var(--radio-lg)',
     boxShadow: 'var(--sombra-lg)',
+    border: '1px solid var(--borde-suave)',
     width: '100%',
     maxWidth: '520px',
   },
@@ -252,25 +257,69 @@ const styles = {
   },
   input: {
     width: '100%',
-    padding: '0.75rem 1rem',
-    border: '1.5px solid #e2e8f0',
+    padding: '0.8rem 1rem',
+    border: '1.5px solid rgba(26,71,42,0.12)',
     borderRadius: 'var(--radio-sm)',
     fontSize: '0.9rem',
-    background: 'white',
+    background: '#fffdf9',
     outline: 'none',
     transition: 'border-color 0.2s',
+  },
+  locationLine: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+  },
+  inputLocation: {
+    flex: 1,
+    minWidth: 0,
+    padding: '0.8rem 1rem',
+    border: '1.5px solid rgba(26,71,42,0.12)',
+    borderRadius: 'var(--radio-sm)',
+    fontSize: '0.9rem',
+    background: '#fffdf9',
+    outline: 'none',
+    transition: 'border-color 0.2s',
+  },
+  iconButton: {
+    width: '44px',
+    height: '44px',
+    background: '#f0fdf4',
+    color: 'var(--verde-oscuro)',
+    border: '1px solid #86efac',
+    borderRadius: 'var(--radio-sm)',
+    cursor: 'pointer',
+    fontSize: '1rem',
+    flexShrink: 0,
+  },
+  btnUbicacion: {
+    width: '100%',
+    padding: '0.8rem 1rem',
+    background: '#f0fdf4',
+    color: 'var(--verde-oscuro)',
+    border: '2px dashed #86efac',
+    borderRadius: 'var(--radio-sm)',
+    fontSize: '0.9rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
+  coordsText: {
+    marginTop: '0.5rem',
+    fontSize: '0.8rem',
+    color: 'var(--verde-oscuro)',
+    fontWeight: '500',
   },
   passwordBox: {
     position: 'relative',
   },
   inputPassword: {
     width: '100%',
-    padding: '0.75rem 1rem',
+    padding: '0.8rem 1rem',
     paddingRight: '3rem',
-    border: '1.5px solid #e2e8f0',
+    border: '1.5px solid rgba(26,71,42,0.12)',
     borderRadius: 'var(--radio-sm)',
     fontSize: '0.9rem',
-    background: 'white',
+    background: '#fffdf9',
     outline: 'none',
   },
   ojito: {
@@ -288,53 +337,11 @@ const styles = {
     padding: '0.75rem 1rem',
     borderRadius: 'var(--radio-sm)',
     marginBottom: '1.2rem',
+    border: '1px solid rgba(26,71,42,0.1)',
   },
   rolTexto: {
     fontSize: '0.85rem',
     color: 'var(--verde-oscuro)',
-  },
-  btnUbicacion: {
-    width: '100%',
-    padding: '0.75rem 1rem',
-    background: '#f0fdf4',
-    color: 'var(--verde-oscuro)',
-    border: '2px dashed #86efac',
-    borderRadius: 'var(--radio-sm)',
-    fontSize: '0.9rem',
-    fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-  },
-  coordsText: {
-    marginTop: '0.5rem',
-    fontSize: '0.8rem',
-    color: 'var(--verde-oscuro)',
-    fontWeight: '500',
-  },
-  municipioContainer: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-  },
-  inputMunicipio: {
-    flex: 1,
-    padding: '0.75rem 1rem',
-    border: '1.5px solid #e2e8f0',
-    borderRadius: 'var(--radio-sm)',
-    fontSize: '0.9rem',
-    background: 'white',
-    outline: 'none',
-    transition: 'border-color 0.2s',
-  },
-  btnUbicacionPeque: {
-    padding: '0.75rem',
-    background: '#f0fdf4',
-    color: 'var(--verde-oscuro)',
-    border: '1px solid #86efac',
-    borderRadius: 'var(--radio-sm)',
-    cursor: 'pointer',
-    fontSize: '1rem',
-    transition: 'all 0.2s',
   },
   btn: {
     width: '100%',
@@ -342,7 +349,7 @@ const styles = {
     background: 'var(--verde-oscuro)',
     color: 'white',
     border: 'none',
-    borderRadius: 'var(--radio-sm)',
+    borderRadius: '999px',
     fontSize: '1rem',
     fontWeight: '600',
     cursor: 'pointer',
