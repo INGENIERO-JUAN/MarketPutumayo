@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useAuth } from '../context/AuthContext';
 import API from '../api/axios';
 
 const Productor = () => {
-  const { usuario } = useAuth();
   const [productos, setProductos] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [mostrarForm, setMostrarForm] = useState(false);
@@ -72,16 +70,17 @@ const Productor = () => {
 
       if (editando) {
         await API.put(`/productos/${editando}`, payload);
-        setMensaje('✅ Producto actualizado. Pendiente de aprobación.');
+        setMensaje('✅ Producto actualizado.');
       } else {
-        await API.post('/productos', payload);
-        setMensaje('✅ Producto enviado para aprobación');
+        const { data } = await API.post('/productos', payload);
+        setMensaje(`✅ ${data.mensaje}`);
       }
 
       cancelar();
       cargarMisProductos();
     } catch (error) {
-      setMensaje(`❌ ${error.response?.data?.error || 'Error al guardar producto'}`);
+      const msgError = error.response?.data?.error || 'Error al guardar producto';
+      setMensaje(`❌ ${msgError}`);
     } finally {
       setCargando(false);
     }
@@ -158,32 +157,32 @@ const Productor = () => {
 };
 
 const styles = {
-  container: { padding: '2rem', maxWidth: '1200px', margin: '0 auto' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' },
-  title: { color: '#1a472a', margin: 0 },
-  btnNuevo: { background: '#1a472a', color: 'white', border: 'none', padding: '0.6rem 1.5rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' },
-  formBox: { background: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.08)', marginBottom: '2rem' },
+  container: { padding: '2.5rem', maxWidth: '1200px', margin: '0 auto' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', background: 'rgba(255,255,255,0.88)', border: '1px solid var(--borde-suave)', borderRadius: 'var(--radio-lg)', padding: '1.25rem 1.4rem', boxShadow: 'var(--sombra-sm)', gap: '1rem', flexWrap: 'wrap' },
+  title: { color: '#1a472a', margin: 0, fontSize: '1.9rem' },
+  btnNuevo: { background: '#1a472a', color: 'white', border: 'none', padding: '0.7rem 1.3rem', borderRadius: '999px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 10px 22px rgba(26,71,42,0.22)' },
+  formBox: { background: 'white', padding: '1.5rem', borderRadius: 'var(--radio-lg)', boxShadow: 'var(--sombra-md)', marginBottom: '2rem', border: '1px solid var(--borde-suave)' },
   formTitle: { color: '#1a472a', marginBottom: '1rem' },
-  input: { width: '100%', padding: '0.75rem', marginBottom: '1rem', border: '1px solid #ddd', borderRadius: '8px', fontSize: '1rem', boxSizing: 'border-box' },
-  textarea: { width: '100%', padding: '0.75rem', marginBottom: '1rem', border: '1px solid #ddd', borderRadius: '8px', fontSize: '1rem', boxSizing: 'border-box', resize: 'vertical' },
+  input: { width: '100%', padding: '0.82rem 0.95rem', marginBottom: '1rem', border: '1.5px solid rgba(26,71,42,0.12)', borderRadius: 'var(--radio-sm)', fontSize: '0.95rem', boxSizing: 'border-box', background: '#fffdf9' },
+  textarea: { width: '100%', padding: '0.82rem 0.95rem', marginBottom: '1rem', border: '1.5px solid rgba(26,71,42,0.12)', borderRadius: 'var(--radio-sm)', fontSize: '0.95rem', boxSizing: 'border-box', resize: 'vertical', background: '#fffdf9' },
   row: { display: 'flex', gap: '1rem' },
-  inputMitad: { flex: 1, padding: '0.75rem', marginBottom: '1rem', border: '1px solid #ddd', borderRadius: '8px', fontSize: '1rem' },
-  btnSubmit: { width: '100%', padding: '0.75rem', background: '#f4a226', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', cursor: 'pointer', fontWeight: 'bold' },
-  preview: { width: '100%', height: '150px', objectFit: 'cover', borderRadius: '8px', marginBottom: '1rem' },
+  inputMitad: { flex: 1, padding: '0.82rem 0.95rem', marginBottom: '1rem', border: '1.5px solid rgba(26,71,42,0.12)', borderRadius: 'var(--radio-sm)', fontSize: '0.95rem', background: '#fffdf9' },
+  btnSubmit: { width: '100%', padding: '0.82rem', background: '#f4a226', color: 'white', border: 'none', borderRadius: '999px', fontSize: '1rem', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 10px 22px rgba(244,162,38,0.22)' },
+  preview: { width: '100%', height: '170px', objectFit: 'cover', borderRadius: 'var(--radio-sm)', marginBottom: '1rem' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1.5rem' },
-  card: { background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 2px 10px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', gap: '0.4rem' },
-  imgPlaceholder: { fontSize: '3rem', textAlign: 'center', background: '#f0f4f0', borderRadius: '8px', padding: '1rem' },
-  img: { width: '100%', height: '150px', objectFit: 'cover', borderRadius: '8px' },
+  card: { background: 'white', borderRadius: 'var(--radio)', padding: '1rem', boxShadow: 'var(--sombra-sm)', display: 'flex', flexDirection: 'column', gap: '0.45rem', border: '1px solid var(--borde-suave)' },
+  imgPlaceholder: { fontSize: '3rem', textAlign: 'center', background: 'linear-gradient(135deg, #d8f3dc 0%, #c8ecd0 100%)', borderRadius: 'var(--radio-sm)', padding: '1.7rem 1rem' },
+  img: { width: '100%', height: '155px', objectFit: 'cover', borderRadius: 'var(--radio-sm)' },
   estado: { fontWeight: 'bold', fontSize: '0.85rem' },
   nombre: { color: '#1a472a', margin: 0 },
   desc: { color: '#666', fontSize: '0.9rem', margin: 0 },
   precio: { color: '#f4a226', fontWeight: 'bold', fontSize: '1.2rem', margin: 0 },
   stock: { color: '#999', fontSize: '0.85rem', margin: 0 },
   cat: { color: '#888', fontSize: '0.8rem', fontStyle: 'italic' },
-  btnEditar: { marginTop: '0.5rem', background: 'transparent', border: '1px solid #1a472a', color: '#1a472a', padding: '0.4rem 0.8rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' },
-  vacio: { textAlign: 'center', padding: '3rem', color: '#999' },
-  exito: { background: '#efe', color: '#1a472a', padding: '0.75rem', borderRadius: '8px', marginBottom: '1rem' },
-  error: { background: '#fee', color: '#c00', padding: '0.75rem', borderRadius: '8px', marginBottom: '1rem' },
+  btnEditar: { marginTop: '0.5rem', background: 'transparent', border: '1.5px solid #1a472a', color: '#1a472a', padding: '0.48rem 0.8rem', borderRadius: '999px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '700' },
+  vacio: { textAlign: 'center', padding: '3rem', color: '#999', background: 'white', borderRadius: 'var(--radio-lg)', border: '1px solid var(--borde-suave)', boxShadow: 'var(--sombra-sm)' },
+  exito: { background: '#f0fdf4', color: '#1a472a', padding: '0.85rem 1rem', borderRadius: 'var(--radio-sm)', marginBottom: '1rem', border: '1px solid #bbf7d0' },
+  error: { background: '#fee', color: '#c00', padding: '0.85rem 1rem', borderRadius: 'var(--radio-sm)', marginBottom: '1rem', border: '1px solid #fecaca' },
 };
 
 export default Productor;

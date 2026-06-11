@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import API from '../api/axios';
@@ -17,12 +17,7 @@ const DetalleProducto = () => {
   const [idConversacion, setIdConversacion] = useState(null);
   const [iniciandoChat, setIniciandoChat] = useState(false);
 
-  useEffect(() => {
-    cargarProducto();
-    cargarResenas();
-  }, [id]);
-
-  const cargarProducto = async () => {
+  const cargarProducto = useCallback(async () => {
     try {
       const { data } = await API.get(`/productos/${id}`);
       setProducto(data);
@@ -31,16 +26,21 @@ const DetalleProducto = () => {
     } finally {
       setCargando(false);
     }
-  };
+  }, [id]);
 
-  const cargarResenas = async () => {
+  const cargarResenas = useCallback(async () => {
     try {
       const { data } = await API.get(`/resenas/${id}`);
       setResenas(data);
-    } catch (error) {
+    } catch {
       // ignorar si no existe el endpoint aún
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    cargarProducto();
+    cargarResenas();
+  }, [cargarProducto, cargarResenas]);
 
   const agregarAlCarrito = () => {
     if (!usuario) { navigate('/login'); return; }
@@ -87,6 +87,7 @@ const DetalleProducto = () => {
       <button style={styles.btnVolver} onClick={() => navigate('/catalogo')}>← Volver al catálogo</button>
 
       <div style={styles.detalle}>
+        {/* Imagen */}
         <div style={styles.imgBox}>
           {producto.imagen_url ? (
             <img src={producto.imagen_url} alt={producto.nombre} style={styles.img}
@@ -95,6 +96,7 @@ const DetalleProducto = () => {
           <div style={{ ...styles.imgPlaceholder, display: producto.imagen_url ? 'none' : 'flex' }}>🌿</div>
         </div>
 
+        {/* Info */}
         <div style={styles.info}>
           <span style={styles.categoria}>{producto.categoria}</span>
           <h1 style={styles.nombre}>{producto.nombre}</h1>
@@ -115,6 +117,7 @@ const DetalleProducto = () => {
 
           {mensaje && <div style={styles.toast}>{mensaje}</div>}
 
+          {/* Botones de acción */}
           <div style={styles.botones}>
             {usuario?.rol === 'COMPRADOR' && (
               <>
@@ -140,6 +143,7 @@ const DetalleProducto = () => {
             )}
           </div>
 
+          {/* Info de pago físico */}
           {usuario?.rol === 'COMPRADOR' && (
             <div style={styles.infoPago}>
               <p style={styles.infoPagoTexto}>
@@ -154,6 +158,7 @@ const DetalleProducto = () => {
         </div>
       </div>
 
+      {/* Reseñas */}
       {resenas.length > 0 && (
         <div style={styles.resenasBox}>
           <h3 style={styles.resenasTitle}>⭐ Reseñas ({resenas.length})</h3>
@@ -170,6 +175,7 @@ const DetalleProducto = () => {
         </div>
       )}
 
+      {/* Chat flotante */}
       {chatAbierto && idConversacion && (
         <Chat
           id_conversacion={idConversacion}

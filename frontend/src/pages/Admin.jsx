@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import API from '../api/axios';
 
@@ -6,6 +6,7 @@ const Admin = () => {
   const { usuario } = useAuth();
   const [seccion, setSeccion] = useState('productos');
   const [productos, setProductos] = useState([]);
+  const [todosProductos, setTodosProductos] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
   const [pedidos, setPedidos] = useState([]);
   const [categorias, setCategorias] = useState([]);
@@ -13,16 +14,14 @@ const Admin = () => {
   const [cargando, setCargando] = useState(false);
   const [mensaje, setMensaje] = useState('');
 
-  useEffect(() => {
-    cargarDatos();
-  }, [seccion]);
-
-  const cargarDatos = async () => {
+  const cargarDatos = useCallback(async () => {
     setCargando(true);
     try {
       if (seccion === 'productos') {
         const { data } = await API.get('/productos/pendientes');
         setProductos(data);
+        const { data: todos } = await API.get('/productos/todos');
+        setTodosProductos(todos);
       } else if (seccion === 'usuarios') {
         const { data } = await API.get('/usuarios');
         setUsuarios(data);
@@ -38,14 +37,18 @@ const Admin = () => {
     } finally {
       setCargando(false);
     }
-  };
+  }, [seccion]);
+
+  useEffect(() => {
+    cargarDatos();
+  }, [cargarDatos]);
 
   const aprobarProducto = async (id, estado) => {
     try {
       await API.put(`/productos/${id}/estado`, { estado });
       setMensaje(`✅ Producto ${estado.toLowerCase()} exitosamente`);
       cargarDatos();
-    } catch (error) {
+    } catch {
       setMensaje('❌ Error al actualizar producto');
     }
   };
@@ -55,7 +58,7 @@ const Admin = () => {
       await API.put(`/usuarios/${id}/estado`, { activo: !activo });
       setMensaje(`✅ Usuario ${!activo ? 'activado' : 'desactivado'}`);
       cargarDatos();
-    } catch (error) {
+    } catch {
       setMensaje('❌ Error al actualizar usuario');
     }
   };
@@ -65,8 +68,19 @@ const Admin = () => {
       await API.put(`/pedidos/${id}/estado`, { estado });
       setMensaje(`✅ Pedido actualizado a ${estado}`);
       cargarDatos();
-    } catch (error) {
+    } catch {
       setMensaje('❌ Error al actualizar pedido');
+    }
+  };
+
+  const eliminarProducto = async (id) => {
+    if (!window.confirm('¿Seguro que deseas eliminar este producto?')) return;
+    try {
+      await API.delete(`/productos/${id}`);
+      setMensaje('✅ Producto eliminado');
+      cargarDatos();
+    } catch {
+      setMensaje('❌ Error al eliminar producto');
     }
   };
 
@@ -105,7 +119,7 @@ const Admin = () => {
       )}
 
       <div style={styles.tabs}>
-        <button style={seccion === 'productos' ? styles.tabActivo : styles.tab} onClick={() => setSeccion('productos')}>📦 Productos</button>
+        <button style={seccion === 'productos' ? styles.tabActivo : styles.tab} onClick={() => setSeccion('productos')}>📦 Pendientes</button>
         <button style={seccion === 'usuarios' ? styles.tabActivo : styles.tab} onClick={() => setSeccion('usuarios')}>👥 Usuarios</button>
         <button style={seccion === 'pedidos' ? styles.tabActivo : styles.tab} onClick={() => setSeccion('pedidos')}>📋 Pedidos</button>
         <button style={seccion === 'categorias' ? styles.tabActivo : styles.tab} onClick={() => setSeccion('categorias')}>🏷️ Categorías</button>
@@ -134,6 +148,37 @@ const Admin = () => {
                 <div style={styles.cardAcciones}>
                   <button style={styles.btnAprobar} onClick={() => aprobarProducto(p.id_producto, 'APROBADO')}>✅ Aprobar</button>
                   <button style={styles.btnRechazar} onClick={() => aprobarProducto(p.id_producto, 'RECHAZADO')}>❌ Rechazar</button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* TODOS LOS PRODUCTOS */}
+      {!cargando && seccion === 'productos' && (
+        <div style={{ marginTop: '2rem' }}>
+          <h3 style={{ color: '#1a472a', marginBottom: '1rem' }}>🗂️ Todos los productos ({todosProductos.length})</h3>
+          {todosProductos.length === 0 ? (
+            <div style={styles.vacio}>No hay productos</div>
+          ) : (
+            todosProductos.map(p => (
+              <div key={p.id_producto} style={styles.card}>
+                <div style={styles.cardInfo}>
+                  {p.imagen_url && (
+                    <img src={p.imagen_url} alt={p.nombre} style={styles.cardImg}
+                      onError={(e) => e.target.style.display = 'none'} />
+                  )}
+                  <h4 style={styles.cardNombre}>{p.nombre}</h4>
+                  <p style={styles.cardDesc}>{p.descripcion}</p>
+                  <p style={styles.cardMeta}>Productor: {p.productor} | Categoría: {p.categoria}</p>
+                  <p style={styles.cardMeta}>Precio: ${Number(p.precio).toLocaleString()} | Stock: {p.stock}</p>
+                  <span style={{ ...styles.badge, background: p.estado === 'APROBADO' ? '#e8f5e9' : p.estado === 'RECHAZADO' ? '#fee' : '#fff8e7', color: p.estado === 'APROBADO' ? '#1a472a' : p.estado === 'RECHAZADO' ? '#c00' : '#f4a226' }}>
+                    {p.estado}
+                  </span>
+                </div>
+                <div style={styles.cardAcciones}>
+                  <button style={styles.btnEliminar} onClick={() => eliminarProducto(p.id_producto)}>🗑️ Eliminar</button>
                 </div>
               </div>
             ))
@@ -259,6 +304,7 @@ const styles = {
   catGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem' },
   catCard: { background: 'white', padding: '0.75rem 1rem', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.07)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   catNombre: { color: '#1a472a', fontWeight: '600', fontSize: '0.9rem' },
+  btnEliminar: { background: '#fee', color: '#c00', border: '1px solid #c00', padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' },
   btnEliminarCat: { background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: '0.2rem' },
 };
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import API from '../api/axios';
@@ -13,18 +13,7 @@ const Conversaciones = () => {
   const [chatActivo, setChatActivo] = useState(null);
   const [otroUsuario, setOtroUsuario] = useState(null);
 
-  useEffect(() => {
-    if (!usuario) { navigate('/login'); return; }
-    cargarConversaciones();
-
-    // Si viene de un producto, abrir chat directamente
-    const idConv = searchParams.get('conv');
-    if (idConv) {
-      setChatActivo(parseInt(idConv));
-    }
-  }, []);
-
-  const cargarConversaciones = async () => {
+  const cargarConversaciones = useCallback(async () => {
     try {
       const { data } = await API.get('/chat/conversaciones');
       setConversaciones(data);
@@ -33,7 +22,18 @@ const Conversaciones = () => {
     } finally {
       setCargando(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!usuario) { navigate('/login'); return; }
+    cargarConversaciones();
+
+    // Si viene de un producto, abrir chat directamente
+    const idConv = searchParams.get('conv');
+    if (idConv) {
+      setChatActivo(parseInt(idConv, 10));
+    }
+  }, [cargarConversaciones, navigate, searchParams, usuario]);
 
   const abrirChat = (conv) => {
     setChatActivo(conv.id_conversacion);
@@ -67,7 +67,7 @@ const Conversaciones = () => {
           <span style={styles.vacioIcon}>💬</span>
           <p style={styles.vacioTexto}>No tienes conversaciones aún</p>
           {usuario.rol === 'COMPRADOR' && (
-            <p style={styles.vacioSub}>Ve al catálogo y haz clic en "Contactar productor" en cualquier producto</p>
+            <p style={styles.vacioSub}>Ve al catálogo y haz clic en &quot;Contactar productor&quot; en cualquier producto</p>
           )}
         </div>
       ) : (

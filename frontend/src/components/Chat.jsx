@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
 import API from '../api/axios';
@@ -14,31 +14,16 @@ const Chat = ({ id_conversacion, otroUsuario, onCerrar }) => {
   const bottomRef = useRef(null);
   const timerEscribiendo = useRef(null);
 
-  useEffect(() => {
-    cargarMensajes();
-    conectarSocket();
-    return () => {
-      if (socket) {
-        socket.disconnect();
-        socket = null;
-      }
-    };
-  }, [id_conversacion]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [mensajes]);
-
-  const cargarMensajes = async () => {
+  const cargarMensajes = useCallback(async () => {
     try {
       const { data } = await API.get(`/chat/conversaciones/${id_conversacion}/mensajes`);
       setMensajes(data.mensajes);
     } catch (error) {
       console.error('Error al cargar mensajes:', error);
     }
-  };
+  }, [id_conversacion]);
 
-  const conectarSocket = () => {
+  const conectarSocket = useCallback(() => {
     const token = localStorage.getItem('token');
     socket = io('http://localhost:4000', { auth: { token } });
 
@@ -64,7 +49,23 @@ const Chat = ({ id_conversacion, otroUsuario, onCerrar }) => {
         setEscribiendo(false);
       }
     });
-  };
+  }, [id_conversacion, usuario.id_usuario]);
+
+  useEffect(() => {
+    cargarMensajes();
+    conectarSocket();
+    return () => {
+      clearTimeout(timerEscribiendo.current);
+      if (socket) {
+        socket.disconnect();
+        socket = null;
+      }
+    };
+  }, [cargarMensajes, conectarSocket]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [mensajes]);
 
   const handleTexto = (e) => {
     setTexto(e.target.value);
